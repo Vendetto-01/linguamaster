@@ -75,7 +75,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          timeout: 60000, // 60 saniye timeout
+          timeout: 1800000, // 180 saniye timeout
         }
       );
 
