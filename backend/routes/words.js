@@ -6,14 +6,17 @@ const axios = require('axios');
 async function fetchWordFromAPI(word) {
   try {
     const response = await axios.get(
-      `${process.env.DICTIONARY_API_BASE_URL}/${word.toLowerCase()}`,
-      { timeout: 10000 }
+      `https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`,
+      { timeout: 30000 } // 30 saniye timeout
     );
     
     return response.data;
   } catch (error) {
     if (error.response && error.response.status === 404) {
       throw new Error(`Kelime bulunamadı: ${word}`);
+    }
+    if (error.code === 'ECONNABORTED') {
+      throw new Error(`Zaman aşımı: ${word}`);
     }
     throw new Error(`API hatası: ${error.message}`);
   }
