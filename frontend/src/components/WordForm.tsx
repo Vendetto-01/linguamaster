@@ -1,37 +1,7 @@
+// frontend/src/components/WordForm.tsx
 import React, { useState } from 'react';
-import axios from 'axios';
-
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
-
-interface WordFormProps {
-  onWordsAdded: () => void;
-}
-
-interface AddWordResponse {
-  message: string;
-  results: {
-    success: Array<{
-      word: string;
-      partOfSpeech: string;
-      definition: string;
-    }>;
-    failed: Array<{
-      word: string;
-      reason: string;
-    }>;
-    duplicate: Array<{
-      word: string;
-      partOfSpeech: string;
-      reason: string;
-    }>;
-  };
-  summary: {
-    success: number;
-    failed: number;
-    duplicate: number;
-    total: number;
-  };
-}
+import { wordApi } from '../services/api';
+import { AddWordResponse, WordFormProps } from '../types';
 
 const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
   const [words, setWords] = useState<string>('');
@@ -39,27 +9,31 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
   const [result, setResult] = useState<AddWordResponse | null>(null);
   const [error, setError] = useState<string>('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!words.trim()) {
-      setError('Lütfen en az bir kelime girin');
-      return;
-    }
-
-    // Kelimeleri ayırıp temizle
-    const wordList = words
+  // Kelime validasyonu
+  const validateWords = (input: string) => {
+    const wordList = input
       .split(/[,\n\s]+/)
       .map(word => word.trim().toLowerCase())
       .filter(word => word.length > 0);
 
     if (wordList.length === 0) {
-      setError('Geçerli kelime bulunamadı');
-      return;
+      return { isValid: false, error: 'En az bir kelime girin', words: [] };
     }
 
     if (wordList.length > 50) {
-      setError('Bir seferde maksimum 50 kelime ekleyebilirsiniz');
+      return { isValid: false, error: 'Maksimum 50 kelime ekleyebilirsiniz', words: [] };
+    }
+
+    return { isValid: true, error: '', words: wordList };
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validasyon
+    const validation = validateWords(words);
+    if (!validation.isValid) {
+      setError(validation.error);
       return;
     }
 
@@ -68,36 +42,23 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
     setResult(null);
 
     try {
-      const response = await axios.post<AddWordResponse>(
-        `${API_BASE_URL}/api/words/bulk`,
-        { words: wordList },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          timeout: 60000, // 60 saniye timeout
-        }
-      );
-
-      setResult(response.data);
-      onWordsAdded(); // Parent component'e bildir
+      // API çağrısı
+      const response = await wordApi.addWords(validation.words);
+      
+      setResult(response);
+      onWordsAdded();
       
       // Başarılı olduysa formu temizle
-      if (response.data.summary.success > 0) {
+      if (response.summary.success > 0) {
         setWords('');
       }
 
-    } catch (err: any) {
-      console.error('Kelime ekleme hatası:', err);
-      
-      if (err.code === 'ECONNABORTED') {
-        setError('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.');
-      } else if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else if (err.response?.data?.error) {
-        setError(err.response.data.error);
+    } catch (err) {
+      // Hata yakalaması
+      if (err instanceof Error) {
+        setError(err.message);
       } else {
-        setError('Kelime eklenirken bir hata oluştu. Lütfen tekrar deneyin.');
+        setError('Beklenmeyen bir hata oluştu');
       }
     } finally {
       setIsLoading(false);
@@ -110,25 +71,45 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
     const { summary, results } = result;
 
     return (
-      <div style={{ marginTop: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px' }}>
-        <h3>İşlem Sonucu</h3>
+      <div style={{ 
+        marginTop: '20px', 
+        padding: '15px', 
+        border: '1px solid #ddd', 
+        borderRadius: '5px' 
+      }}>
+        <h3>📊 İşlem Sonucu</h3>
         
         {/* Özet */}
-        <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '3px' }}>
-          <p><strong>Toplam kelime:</strong> {summary.total}</p>
-          <p style={{ color: 'green' }}><strong>Başarılı:</strong> {summary.success}</p>
-          <p style={{ color: 'orange' }}><strong>Tekrar:</strong> {summary.duplicate}</p>
-          <p style={{ color: 'red' }}><strong>Başarısız:</strong> {summary.failed}</p>
+        <div style={{ 
+          marginBottom: '15px', 
+          padding: '10px', 
+          backgroundColor: '#f5f5f5', 
+          borderRadius: '3px' 
+        }}>
+          <p><strong>📚 Toplam:</strong> {summary.total}</p>
+          <p style={{ color: 'green' }}><strong>✅ Eklendi:</strong> {summary.success}</p>
+          <p style={{ color: 'orange' }}><strong>⚠️ Zaten mevcut:</strong> {summary.duplicate}</p>
+          <p style={{ color: 'red' }}><strong>❌ Başarısız:</strong> {summary.failed}</p>
         </div>
 
         {/* Başarılı kelimeler */}
         {results.success.length > 0 && (
           <div style={{ marginBottom: '15px' }}>
-            <h4 style={{ color: 'green' }}>✅ Başarıyla eklenen kelimeler ({results.success.length})</h4>
-            <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '14px' }}>
+            <h4 style={{ color: 'green' }}>✅ Eklenen kelimeler</h4>
+            <div style={{ 
+              maxHeight: '150px', 
+              overflowY: 'auto', 
+              fontSize: '14px',
+              border: '1px solid #ddd',
+              borderRadius: '3px',
+              padding: '5px'
+            }}>
               {results.success.slice(0, 10).map((item, index) => (
-                <div key={index} style={{ padding: '5px', borderBottom: '1px solid #eee' }}>
-                  <strong>{item.word}</strong> ({item.partOfSpeech}) - {item.definition}
+                <div key={index} style={{ 
+                  padding: '5px', 
+                  borderBottom: '1px solid #eee' 
+                }}>
+                  <strong>{item.word}</strong> ({item.partOfSpeech})
                 </div>
               ))}
               {results.success.length > 10 && (
@@ -140,30 +121,18 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
           </div>
         )}
 
-        {/* Tekrar eden kelimeler */}
-        {results.duplicate.length > 0 && (
-          <div style={{ marginBottom: '15px' }}>
-            <h4 style={{ color: 'orange' }}>⚠️ Zaten mevcut kelimeler ({results.duplicate.length})</h4>
-            <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '14px' }}>
-              {results.duplicate.slice(0, 5).map((item, index) => (
-                <div key={index} style={{ padding: '3px' }}>
-                  {item.word} ({item.partOfSpeech})
-                </div>
-              ))}
-              {results.duplicate.length > 5 && (
-                <p style={{ fontStyle: 'italic', color: '#666' }}>
-                  ... ve {results.duplicate.length - 5} kelime daha
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Başarısız kelimeler */}
         {results.failed.length > 0 && (
           <div>
-            <h4 style={{ color: 'red' }}>❌ Eklenemeyen kelimeler ({results.failed.length})</h4>
-            <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '14px' }}>
+            <h4 style={{ color: 'red' }}>❌ Eklenemeyen kelimeler</h4>
+            <div style={{ 
+              maxHeight: '100px', 
+              overflowY: 'auto', 
+              fontSize: '14px',
+              border: '1px solid #ddd',
+              borderRadius: '3px',
+              padding: '5px'
+            }}>
               {results.failed.map((item, index) => (
                 <div key={index} style={{ padding: '3px' }}>
                   <strong>{item.word}</strong> - {item.reason}
@@ -178,18 +147,22 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
-      <h2>📚 Kelime Ekleme</h2>
+      <h2>📚 Kelime Ekle</h2>
       
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="words" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          <label htmlFor="words" style={{ 
+            display: 'block', 
+            marginBottom: '5px', 
+            fontWeight: 'bold' 
+          }}>
             Kelimeler (virgül, boşluk veya yeni satırla ayırın)
           </label>
           <textarea
             id="words"
             value={words}
             onChange={(e) => setWords(e.target.value)}
-            placeholder="Örnek: apple, book, computer&#10;house&#10;beautiful, interesting"
+            placeholder="Örnek: apple, book, computer&#10;house&#10;beautiful"
             rows={6}
             style={{
               width: '100%',
@@ -202,7 +175,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
             disabled={isLoading}
           />
           <small style={{ color: '#666', fontSize: '12px' }}>
-            Maksimum 50 kelime ekleyebilirsiniz. Her kelime için API'den anlamlar çekilecek.
+            Maksimum 50 kelime ekleyebilirsiniz
           </small>
         </div>
 
@@ -232,7 +205,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
             width: '100%'
           }}
         >
-          {isLoading ? '🔄 Kelimeler ekleniyor...' : '➕ Kelimeleri Ekle'}
+          {isLoading ? '🔄 Ekleniyor...' : '➕ Kelimeleri Ekle'}
         </button>
       </form>
 
