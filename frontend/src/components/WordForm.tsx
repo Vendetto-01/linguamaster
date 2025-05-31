@@ -38,6 +38,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AddWordResponse | null>(null);
   const [error, setError] = useState<string>('');
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +67,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
     setIsLoading(true);
     setError('');
     setResult(null);
+    setProgress({ current: 0, total: wordList.length });
 
     try {
       const response = await axios.post<AddWordResponse>(
@@ -75,7 +77,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          timeout: 1800000, // 180 saniye timeout
+          timeout: 60000, // 60 saniye timeout
         }
       );
 
@@ -101,6 +103,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
       }
     } finally {
       setIsLoading(false);
+      setProgress({ current: 0, total: 0 });
     }
   };
 
@@ -215,6 +218,43 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
             marginBottom: '15px'
           }}>
             {error}
+          </div>
+        )}
+
+        {/* Progress Bar */}
+        {isLoading && progress.total > 0 && (
+          <div style={{ marginBottom: '15px' }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}>
+              <span style={{ fontSize: '14px', color: '#666' }}>
+                İşleniyor... {progress.current}/{progress.total} kelime
+              </span>
+              <span style={{ fontSize: '12px', color: '#999' }}>
+                {Math.round((progress.current / progress.total) * 100)}%
+              </span>
+            </div>
+            <div style={{
+              width: '100%',
+              height: '8px',
+              backgroundColor: '#f0f0f0',
+              borderRadius: '4px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${(progress.current / progress.total) * 100}%`,
+                height: '100%',
+                backgroundColor: '#007bff',
+                borderRadius: '4px',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+            <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
+              Bu işlem birkaç dakika sürebilir. Lütfen sayfayı kapatmayın.
+            </div>
           </div>
         )}
 
