@@ -231,7 +231,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
               marginBottom: '8px'
             }}>
               <span style={{ fontSize: '14px', color: '#666' }}>
-                İşleniyor... {progress.current}/{progress.total} kelime
+                İşleniyor... {Math.floor(progress.current)}/{progress.total} kelime
               </span>
               <span style={{ fontSize: '12px', color: '#999' }}>
                 {Math.round((progress.current / progress.total) * 100)}%
