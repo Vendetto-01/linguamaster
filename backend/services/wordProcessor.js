@@ -46,28 +46,25 @@ class WordProcessor {
           const partOfSpeech = meaning.partOfSpeech || 'unknown';
           
           if (meaning.definitions && Array.isArray(meaning.definitions)) {
-            meaning.definitions.forEach((def, index) => {
-              // Her kelime için sadece ilk anlamı al (çok fazla data olmasın)
-              if (index === 0) {
-                const wordData = {
-                  word: word.toLowerCase(),
-                  part_of_speech: partOfSpeech.toLowerCase(),
-                  definition: def.definition,
-                  phonetic: phonetic || null,
-                  example: def.example || null,
-                  synonyms: meaning.synonyms?.slice(0, 5) || [], // Max 5 synonym
-                  antonyms: meaning.antonyms?.slice(0, 5) || [], // Max 5 antonym
-                  source: 'file-upload',
-                  times_shown: 0,
-                  times_correct: 0,
-                  difficulty: 'medium',
-                  is_active: true,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                };
-                
-                results.push(wordData);
-              }
+            meaning.definitions.forEach(def => {
+              const wordData = {
+                word: word.toLowerCase(),
+                part_of_speech: partOfSpeech.toLowerCase(),
+                definition: def.definition,
+                phonetic: phonetic || null,
+                example: def.example || null,
+                synonyms: meaning.synonyms?.slice(0, 5) || [], // Max 5 synonym
+                antonyms: meaning.antonyms?.slice(0, 5) || [], // Max 5 antonym
+                source: 'file-upload',
+                times_shown: 0,
+                times_correct: 0,
+                difficulty: 'medium',
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              
+              results.push(wordData);
             });
           }
         });
@@ -127,31 +124,51 @@ class WordProcessor {
         // İlk anlamı words tablosuna kaydet
         const wordToSave = parsedWords[0];
 
-        // Duplicate kontrolü
-        const { data: existing, error: checkError } = await this.supabase
-          .from('words')
-          .select('id')
-          .eq('word', wordToSave.word)
-          .eq('part_of_speech', wordToSave.part_of_speech)
-          .single();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          throw checkError;
-        }
-
-        if (!existing) {
-          // Yeni kayıt ekle
-          const { error: insertError } = await this.supabase
-            .from('words')
-            .insert([wordToSave]);
-
-          if (insertError) {
-            throw insertError;
+        // Her anlamı ayrı ayrı kontrol et ve kaydet (manuel süreçle aynı)
+        let wordProcessed = false;
+        for (const wordData of parsedWords) {
+          try {
+            // Üçlü kombinasyon kontrolü: word + part_of_speech + definition
+            const { data: existing, error: checkError } = await this.supabase
+              .from('words')
+              .select('id')
+              .eq('word', wordData.word)
+              .eq('part_of_speech', wordData.part_of_speech)
+              .eq('definition', wordData.definition)
+              .single();
+            
+            if (checkError && checkError.code !== 'PGRST116') {
+              throw checkError;
+            }
+            
+            if (existing) {
+              // Bu kombinasyon zaten mevcut
+              if (!wordProcessed) {
+                console.log(`📝 ${pendingWord.word} (${wordData.part_of_speech}) zaten mevcut, atlandı`);
+                wordProcessed = true;
+              }
+              continue;
+            }
+            
+            // Yeni kayıt ekle
+            const { error: insertError } = await this.supabase
+              .from('words')
+              .insert([wordData]);
+            
+            if (insertError) {
+              throw insertError;
+            }
+            
+            console.log(`✅ ${pendingWord.word} (${wordData.part_of_speech}) başarıyla eklendi`);
+            wordProcessed = true;
+            break; // İlk başarılı kayıttan sonra bu kelime için dur
+            
+          } catch (saveError) {
+            console.error(`❌ ${wordData.word} kaydetme hatası:`, saveError);
+            if (!wordProcessed) {
+              throw saveError; // İlk hata ise yukardaki catch'e geç
+            }
           }
-
-          console.log(`✅ ${pendingWord.word} başarıyla eklendi`);
-        } else {
-          console.log(`📝 ${pendingWord.word} zaten mevcut, atlandı`);
         }
 
         // Pending'den sil
@@ -164,7 +181,7 @@ class WordProcessor {
         return { 
           status: 'success', 
           word: pendingWord.word,
-          definition: wordToSave.definition.substring(0, 50) + '...'
+          definitions: parsedWords.length
         };
 
       } catch (wordError) {
