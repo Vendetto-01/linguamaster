@@ -67,7 +67,232 @@ function parseWordData(apiData, originalWord) {
   return results;
 }
 
-// POST /api/words/bulk - Toplu kelime ekleme
+// POST /api/words/bulk-stream - Real-time progress ile toplu kelime ekleme
+router.post('/bulk-stream', async (req, res) => {
+  try {
+    const { words } = req.body;
+    
+    if (!words || !Array.isArray(words) || words.length === 0) {
+      return res.status(400).json({
+        error: 'Kelime listesi gerekli',
+        message: 'Lütfen bir kelime dizisi gönderin'
+      });
+    }
+    
+    if (words.length > 50) {
+      return res.status(400).json({
+        error: 'Çok fazla kelime',
+        message: 'Bir seferde maksimum 50 kelime ekleyebilirsiniz'
+      });
+    }
+
+    // Server-Sent Events için header ayarları
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    const results = {
+      success: [],
+      failed: [],
+      duplicate: [],
+      total: words.length
+    };
+
+    // Başlangıç mesajı gönder
+    res.write(`data: ${JSON.stringify({
+      type: 'start',
+      total: words.length,
+      message: 'Kelime işleme başladı...'
+    })}\n\n`);
+
+    // Her kelime için API'den veri çek
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      
+      try {
+        // Progress update gönder
+        res.write(`data: ${JSON.stringify({
+          type: 'progress',
+          current: i + 1,
+          total: words.length,
+          currentWord: word,
+          message: `İşleniyor: ${word}`
+        })}\n\n`);
+
+        console.log(`📖 İşleniyor: ${word} (${i + 1}/${words.length})`);
+        
+        // API'den kelime verilerini çek
+        const apiData = await fetchWordFromAPI(word);
+        const parsedWords = parseWordData(apiData, word);
+        
+        if (parsedWords.length === 0) {
+          results.failed.push({
+            word,
+            reason: 'API\'den veri alınamadı'
+          });
+          
+          // Başarısız kelime update'i gönder
+          res.write(`data: ${JSON.stringify({
+            type: 'word_failed',
+            word: word,
+            reason: 'API\'den veri alınamadı',
+            current: i + 1,
+            total: words.length
+          })}\n\n`);
+          
+          continue;
+        }
+        
+        // Her anlam için Supabase'e kaydet
+        let wordProcessed = false;
+        for (const wordData of parsedWords) {
+          try {
+            // Önce aynı kombinasyonun var olup olmadığını kontrol et
+            const { data: existing, error: checkError } = await req.supabase
+              .from('words')
+              .select('id')
+              .eq('word', wordData.word)
+              .eq('part_of_speech', wordData.part_of_speech)
+              .eq('definition', wordData.definition)
+              .single();
+            
+            if (checkError && checkError.code !== 'PGRST116') {
+              throw checkError;
+            }
+            
+            if (existing) {
+              // Duplicate
+              if (!wordProcessed) {
+                results.duplicate.push({
+                  word: wordData.word,
+                  partOfSpeech: wordData.part_of_speech,
+                  reason: 'Bu kelime + anlam kombinasyonu zaten mevcut'
+                });
+                
+                // Duplicate update gönder
+                res.write(`data: ${JSON.stringify({
+                  type: 'word_duplicate',
+                  word: wordData.word,
+                  partOfSpeech: wordData.part_of_speech,
+                  current: i + 1,
+                  total: words.length
+                })}\n\n`);
+                
+                wordProcessed = true;
+              }
+              continue;
+            }
+            
+            // Yeni kayıt ekle
+            const { data: insertData, error: insertError } = await req.supabase
+              .from('words')
+              .insert([wordData])
+              .select()
+              .single();
+            
+            if (insertError) {
+              throw insertError;
+            }
+            
+            results.success.push({
+              word: wordData.word,
+              partOfSpeech: wordData.part_of_speech,
+              definition: wordData.definition.substring(0, 100) + '...'
+            });
+            
+            // Başarılı kelime update'i gönder
+            res.write(`data: ${JSON.stringify({
+              type: 'word_success',
+              word: wordData.word,
+              partOfSpeech: wordData.part_of_speech,
+              definition: wordData.definition.substring(0, 100) + '...',
+              current: i + 1,
+              total: words.length
+            })}\n\n`);
+            
+            wordProcessed = true;
+            break; // İlk başarılı kayıttan sonra bu kelime için dur
+            
+          } catch (saveError) {
+            console.error('❌ Kelime kaydetme hatası:', saveError);
+            if (!wordProcessed) {
+              results.failed.push({
+                word: wordData.word,
+                reason: `Veritabanı hatası: ${saveError.message}`
+              });
+              
+              // Başarısız kayıt update'i gönder
+              res.write(`data: ${JSON.stringify({
+                type: 'word_failed',
+                word: wordData.word,
+                reason: `Veritabanı hatası: ${saveError.message}`,
+                current: i + 1,
+                total: words.length
+              })}\n\n`);
+              
+              wordProcessed = true;
+            }
+          }
+        }
+        
+        // Rate limiting için kısa bekleme
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (wordError) {
+        results.failed.push({
+          word,
+          reason: wordError.message
+        });
+        
+        // Kelime hatası update'i gönder
+        res.write(`data: ${JSON.stringify({
+          type: 'word_failed',
+          word: word,
+          reason: wordError.message,
+          current: i + 1,
+          total: words.length
+        })}\n\n`);
+      }
+    }
+
+    // Tamamlanma mesajı gönder
+    const summary = {
+      success: results.success.length,
+      failed: results.failed.length,
+      duplicate: results.duplicate.length,
+      total: results.total
+    };
+
+    res.write(`data: ${JSON.stringify({
+      type: 'complete',
+      results,
+      summary,
+      message: 'Toplu kelime ekleme işlemi tamamlandı'
+    })}\n\n`);
+
+    // Bağlantıyı kapat
+    res.write(`data: ${JSON.stringify({ type: 'end' })}\n\n`);
+    res.end();
+    
+  } catch (error) {
+    console.error('❌ Toplu kelime ekleme hatası:', error);
+    
+    // Hata mesajı gönder
+    res.write(`data: ${JSON.stringify({
+      type: 'error',
+      error: 'Sunucu hatası',
+      message: error.message
+    })}\n\n`);
+    
+    res.end();
+  }
+});
+
+// POST /api/words/bulk - Eski endpoint (geriye uyumluluk için)
 router.post('/bulk', async (req, res) => {
   try {
     const { words } = req.body;
