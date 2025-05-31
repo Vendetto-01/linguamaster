@@ -1,82 +1,116 @@
-// backend/server.js'e bu fonksiyonları ekle
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
-// Standart response formatı
-const createResponse = (success, data, message, meta = {}) => ({
-  success,
-  message,
-  data,
-  meta: {
-    timestamp: new Date().toISOString(),
-    ...meta
+const app = express();
+
+// Render.com için PORT konfigürasyonu
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(helmet());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.FRONTEND_URL, /\.render\.com$/] 
+    : ['http://localhost:3000'],
+  credentials: true
+}));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 100, // IP başına maksimum istek
+  message: {
+    error: 'Çok fazla istek',
+    message: 'Lütfen 15 dakika sonra tekrar deneyin'
   }
 });
 
-// Input validation middleware
-const validateWordInput = (req, res, next) => {
-  const { words } = req.body;
-  
-  // Kelime array'i kontrolü
-  if (!words || !Array.isArray(words)) {
-    return res.status(400).json(
-      createResponse(false, null, 'Kelime listesi gerekli ve array olmalı')
-    );
-  }
-  
-  // Kelime sayısı kontrolü
-  if (words.length === 0) {
-    return res.status(400).json(
-      createResponse(false, null, 'En az bir kelime gerekli')
-    );
-  }
-  
-  if (words.length > 50) {
-    return res.status(400).json(
-      createResponse(false, null, 'Maksimum 50 kelime ekleyebilirsiniz')
-    );
-  }
-  
-  // Her kelimeyi kontrol et
-  const invalidWords = words.filter(word => 
-    typeof word !== 'string' || 
-    word.trim().length === 0 || 
-    word.length > 100 ||
-    !/^[a-zA-Z\s\-']+$/.test(word.trim())
-  );
-  
-  if (invalidWords.length > 0) {
-    return res.status(400).json(
-      createResponse(false, null, 'Geçersiz kelimeler bulundu', { 
-        invalidWords: invalidWords.slice(0, 5) 
-      })
-    );
-  }
-  
-  // Temizlenmiş kelimeler
-  req.validatedWords = words.map(word => word.trim().toLowerCase());
+app.use('/api/', limiter);
+
+// Supabase bağlantısı
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ SUPABASE_URL ve SUPABASE_ANON_KEY environment variables gerekli');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Supabase middleware
+app.use((req, res, next) => {
+  req.supabase = supabase;
   next();
-};
+});
 
-// Async error wrapper
-const asyncWrapper = (fn) => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
+// Health check endpoint (Render.com için gerekli)
+app.get('/', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'English Quiz Backend API',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
-// Global error handler (en sona ekle)
-const errorHandler = (error, req, res, next) => {
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Routes
+const wordRoutes = require('./routes/words');
+app.use('/api/words', wordRoutes);
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Endpoint bulunamadı',
+    message: `${req.method} ${req.originalUrl} endpoint'i mevcut değil`,
+    availableEndpoints: [
+      'GET /',
+      'GET /health',
+      'GET /api/words',
+      'POST /api/words/bulk',
+      'POST /api/words/bulk-stream',
+      'GET /api/words/stats',
+      'GET /api/words/random'
+    ]
+  });
+});
+
+// Error handler
+app.use((error, req, res, next) => {
   console.error('❌ Server Error:', error);
   
   // Supabase errors
   if (error.code === 'PGRST116') {
-    return res.status(404).json(
-      createResponse(false, null, 'Veritabanı tablosu bulunamadı')
-    );
+    return res.status(404).json({
+      error: 'Veritabanı tablosu bulunamadı',
+      message: 'Lütfen Supabase dashboard\'dan "words" tablosunu oluşturun'
+    });
   }
   
   // Network timeout
   if (error.code === 'ECONNABORTED') {
-    return res.status(408).json(
-      createResponse(false, null, 'İstek zaman aşımına uğradı')
-    );
+    return res.status(408).json({
+      error: 'İstek zaman aşımına uğradı',
+      message: 'Lütfen daha sonra tekrar deneyin'
+    });
   }
   
   // Generic error
@@ -85,11 +119,35 @@ const errorHandler = (error, req, res, next) => {
     ? error.message 
     : 'Sunucu hatası oluştu';
     
-  res.status(statusCode).json(
-    createResponse(false, null, message)
-  );
-};
+  res.status(statusCode).json({
+    error: 'Sunucu hatası',
+    message
+  });
+});
 
-// Routes'larda kullanım:
-// app.use('/api/words', validateWordInput, wordRoutes);
-// app.use(errorHandler); // En sona ekle
+// Graceful shutdown
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server ${PORT} portunda çalışıyor`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Supabase URL: ${supabaseUrl}`);
+  console.log(`⏰ Başlatma zamanı: ${new Date().toISOString()}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM signal alındı, sunucu kapatılıyor...');
+  server.close(() => {
+    console.log('✅ HTTP server kapatıldı');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT signal alındı, sunucu kapatılıyor...');
+  server.close(() => {
+    console.log('✅ HTTP server kapatıldı');
+    process.exit(0);
+  });
+});
+
+module.exports = app;
