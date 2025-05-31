@@ -637,4 +637,211 @@ router.delete('/clear', async (req, res) => {
   }
 });
 
+// POST /api/words/upload-file - Dosyadan kelime yükleme
+router.post('/upload-file', async (req, res) => {
+  try {
+    const { words, fileName } = req.body;
+    
+    // Validasyon
+    if (!words || !Array.isArray(words) || words.length === 0) {
+      return res.status(400).json({
+        error: 'Kelime listesi gerekli',
+        message: 'Lütfen geçerli bir kelime dizisi gönderin'
+      });
+    }
+    
+    if (words.length > 50000) {
+      return res.status(400).json({
+        error: 'Çok fazla kelime',
+        message: 'Maksimum 50.000 kelime yükleyebilirsiniz'
+      });
+    }
+
+    // Kelimeleri temizle ve unique yap
+    const cleanWords = [...new Set(
+      words
+        .map(word => word.toString().trim().toLowerCase())
+        .filter(word => word.length > 0 && word.length <= 50)
+        .filter(word => /^[a-zA-Z\s-']+$/.test(word)) // Sadece harf, tire, apostrof
+    )];
+
+    if (cleanWords.length === 0) {
+      return res.status(400).json({
+        error: 'Geçerli kelime bulunamadı',
+        message: 'Dosyada işlenebilir kelime bulunamadı'
+      });
+    }
+
+    // Batch ID oluştur
+    const batchId = require('crypto').randomUUID();
+
+    // Pending words tablosuna toplu ekleme
+    const pendingWordsData = cleanWords.map(word => ({
+      word: word,
+      upload_batch_id: batchId
+    }));
+
+    console.log(`📁 ${fileName || 'Unknown'} dosyasından ${cleanWords.length} kelime işleniyor...`);
+
+    // Supabase'e toplu ekleme (1000'lik gruplar halinde)
+    const batchSize = 1000;
+    let totalInserted = 0;
+    let duplicateCount = 0;
+
+    for (let i = 0; i < pendingWordsData.length; i += batchSize) {
+      const batch = pendingWordsData.slice(i, i + batchSize);
+      
+      try {
+        const { data, error } = await req.supabase
+          .from('pending_words')
+          .insert(batch)
+          .select('id');
+
+        if (error) {
+          // Duplicate key hatası ise devam et
+          if (error.code === '23505') {
+            duplicateCount += batch.length;
+            console.log(`⚠️ ${batch.length} duplicate kelime atlandı`);
+            continue;
+          }
+          throw error;
+        }
+
+        totalInserted += data?.length || 0;
+        console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} eklendi (${data?.length || 0} kelime)`);
+        
+      } catch (batchError) {
+        console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} hatası:`, batchError);
+        // Bu batch'i atla, devam et
+        continue;
+      }
+    }
+
+    // Sonuçları döndür
+    res.json({
+      message: 'Dosya başarıyla yüklendi ve işlenmeye hazır',
+      results: {
+        fileName: fileName || 'Unknown',
+        batchId: batchId,
+        totalWords: cleanWords.length,
+        inserted: totalInserted,
+        duplicates: duplicateCount,
+        failed: cleanWords.length - totalInserted - duplicateCount
+      },
+      status: 'uploaded',
+      nextStep: 'Background processing başlayacak'
+    });
+
+    console.log(`🎉 Dosya yükleme tamamlandı: ${totalInserted} kelime queue'ya eklendi`);
+    
+  } catch (error) {
+    console.error('❌ Dosya yükleme hatası:', error);
+    res.status(500).json({
+      error: 'Dosya yükleme hatası',
+      message: error.message
+    });
+  }
+});
+
+// GET /api/words/queue-status/:batchId - Queue durumunu kontrol et
+router.get('/queue-status/:batchId', async (req, res) => {
+  try {
+    const { batchId } = req.params;
+
+    // Kalan kelime sayısı
+    const { count: remainingCount, error: countError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('upload_batch_id', batchId);
+
+    if (countError) {
+      throw countError;
+    }
+
+    // Bu batch'ten işlenmiş kelime sayısı
+    const { count: processedCount, error: processedError } = await req.supabase
+      .from('words')
+      .select('*', { count: 'exact', head: true })
+      .eq('source', 'file-upload')
+      .like('created_at', `%${new Date().toISOString().split('T')[0]}%`); // Bugün eklenenler
+
+    if (processedError && processedError.code !== 'PGRST116') {
+      throw processedError;
+    }
+
+    // Genel queue istatistikleri
+    const { count: totalPendingCount, error: totalCountError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true });
+
+    if (totalCountError) {
+      throw totalCountError;
+    }
+
+    res.json({
+      batchId,
+      remaining: remainingCount || 0,
+      processed: processedCount || 0,
+      totalPendingInQueue: totalPendingCount || 0,
+      status: (remainingCount || 0) > 0 ? 'processing' : 'completed',
+      lastUpdate: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Queue status hatası:', error);
+    res.status(500).json({
+      error: 'Queue status alınamadı',
+      message: error.message
+    });
+  }
+});
+
+// GET /api/words/queue-stats - Genel queue istatistikleri
+router.get('/queue-stats', async (req, res) => {
+  try {
+    // Toplam pending kelimeler
+    const { count: totalPending, error: pendingError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true });
+
+    if (pendingError) {
+      throw pendingError;
+    }
+
+    // Batch sayısı
+    const { data: batches, error: batchError } = await req.supabase
+      .from('pending_words')
+      .select('upload_batch_id')
+      .limit(1000);
+
+    if (batchError) {
+      throw batchError;
+    }
+
+    const uniqueBatches = [...new Set(batches?.map(b => b.upload_batch_id) || [])];
+
+    // En eski pending kelime
+    const { data: oldestWord, error: oldestError } = await req.supabase
+      .from('pending_words')
+      .select('created_at, word')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single();
+
+    res.json({
+      totalPendingWords: totalPending || 0,
+      activeBatches: uniqueBatches.length,
+      oldestPendingWord: oldestWord || null,
+      isQueueActive: (totalPending || 0) > 0,
+      lastUpdate: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Queue stats hatası:', error);
+    res.status(500).json({
+      error: 'Queue istatistikleri alınamadı',
+      message: error.message
+    });
+  }
+});
 module.exports = router;

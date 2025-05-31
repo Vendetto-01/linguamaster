@@ -55,7 +55,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   res.json({
     status: 'OK',
-    message: 'English Quiz Backend API',
+    message: 'Word Wizard Backend API',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'

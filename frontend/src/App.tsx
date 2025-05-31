@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import WordForm from './components/WordForm';
+import FileUpload from './components/FileUpload';
 import './App.css';
 
 function App() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState<'manual' | 'file'>('file');
 
   const handleWordsAdded = () => {
     // Gelecekte kelime listesi eklendiğinde buradan yenileyeceğiz
     setRefreshKey(prev => prev + 1);
     console.log('Kelimeler eklendi, sayfa yenileniyor...');
+  };
+
+  const handleFileUploaded = (result: any) => {
+    console.log('Dosya yüklendi:', result);
+    handleWordsAdded();
   };
 
   return (
@@ -20,12 +27,57 @@ function App() {
         textAlign: 'center',
         marginBottom: '30px'
       }}>
-        <h1>🌍 LinguaMaster</h1>
+        <h1>🧙‍♂️ Word Wizard</h1>
         <p>İngilizce Kelime Veritabanı Yöneticisi</p>
       </header>
 
+      {/* Tab Navigation */}
+      <div style={{ 
+        maxWidth: '600px', 
+        margin: '0 auto 30px auto',
+        display: 'flex',
+        borderBottom: '1px solid #ddd'
+      }}>
+        <button
+          onClick={() => setActiveTab('file')}
+          style={{
+            flex: 1,
+            padding: '15px',
+            border: 'none',
+            backgroundColor: activeTab === 'file' ? '#007bff' : '#f8f9fa',
+            color: activeTab === 'file' ? 'white' : '#333',
+            cursor: 'pointer',
+            fontSize: '16px',
+            borderTopLeftRadius: '5px',
+            borderTopRightRadius: activeTab === 'file' ? '5px' : '0'
+          }}
+        >
+          📁 Dosya Yükleme
+        </button>
+        <button
+          onClick={() => setActiveTab('manual')}
+          style={{
+            flex: 1,
+            padding: '15px',
+            border: 'none',
+            backgroundColor: activeTab === 'manual' ? '#007bff' : '#f8f9fa',
+            color: activeTab === 'manual' ? 'white' : '#333',
+            cursor: 'pointer',
+            fontSize: '16px',
+            borderTopRightRadius: '5px',
+            borderTopLeftRadius: activeTab === 'manual' ? '5px' : '0'
+          }}
+        >
+          ✍️ Manuel Ekleme
+        </button>
+      </div>
+
       <main>
-        <WordForm onWordsAdded={handleWordsAdded} />
+        {activeTab === 'file' ? (
+          <FileUpload onFileUploaded={handleFileUploaded} />
+        ) : (
+          <WordForm onWordsAdded={handleWordsAdded} />
+        )}
       </main>
 
       <footer style={{ 

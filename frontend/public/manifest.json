@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Word Wizard",
+  "name": "Word Wizard - İngilizce Kelime Veritabanı Yöneticisi",
   "icons": [
     {
       "src": "favicon.ico",
