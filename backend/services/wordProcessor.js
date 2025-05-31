@@ -124,8 +124,10 @@ class WordProcessor {
         // İlk anlamı words tablosuna kaydet
         const wordToSave = parsedWords[0];
 
-        // Her anlamı ayrı ayrı kontrol et ve kaydet (manuel süreçle aynı)
-        let wordProcessed = false;
+        // Her anlamı ayrı ayrı kontrol et ve kaydet (manuel süreçle tam aynı)
+        let addedCount = 0;
+        let duplicateCount = 0;
+        
         for (const wordData of parsedWords) {
           try {
             // Üçlü kombinasyon kontrolü: word + part_of_speech + definition
@@ -143,10 +145,7 @@ class WordProcessor {
             
             if (existing) {
               // Bu kombinasyon zaten mevcut
-              if (!wordProcessed) {
-                console.log(`📝 ${pendingWord.word} (${wordData.part_of_speech}) zaten mevcut, atlandı`);
-                wordProcessed = true;
-              }
+              duplicateCount++;
               continue;
             }
             
@@ -159,17 +158,16 @@ class WordProcessor {
               throw insertError;
             }
             
-            console.log(`✅ ${pendingWord.word} (${wordData.part_of_speech}) başarıyla eklendi`);
-            wordProcessed = true;
-            break; // İlk başarılı kayıttan sonra bu kelime için dur
+            addedCount++;
             
           } catch (saveError) {
-            console.error(`❌ ${wordData.word} kaydetme hatası:`, saveError);
-            if (!wordProcessed) {
-              throw saveError; // İlk hata ise yukardaki catch'e geç
-            }
+            console.error(`❌ ${wordData.word} (${wordData.part_of_speech}) kaydetme hatası:`, saveError);
+            // Bu anlamı atla, diğer anlamlara devam et
+            continue;
           }
         }
+        
+        console.log(`✅ ${pendingWord.word}: ${addedCount} anlam eklendi, ${duplicateCount} duplicate atlandı`);
 
         // Pending'den sil
         await this.supabase
@@ -181,7 +179,9 @@ class WordProcessor {
         return { 
           status: 'success', 
           word: pendingWord.word,
-          definitions: parsedWords.length
+          addedDefinitions: addedCount,
+          duplicateDefinitions: duplicateCount,
+          totalDefinitions: parsedWords.length
         };
 
       } catch (wordError) {
