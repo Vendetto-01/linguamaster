@@ -49,7 +49,7 @@ Important rules:
       console.log(`🤖 Gemini API'ye istek gönderiliyor: ${word}`);
 
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${this.geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`,
         {
           contents: [{
             parts: [{
