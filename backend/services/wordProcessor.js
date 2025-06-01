@@ -401,3 +401,72 @@ Important rules:
     this.startTime = new Date();
     this.processedCount = 0;
     this.errorCount = 0;
+
+    console.log('🚀 Word processor aşamalı analiz sistemi başlatıldı');
+
+    try {
+      while (this.isProcessing) {
+        try {
+          const result = await this.processOneWord();
+
+          if (result.status === 'queue_empty') {
+            console.log('📭 Queue boş, processing durduruluyor');
+            break;
+          }
+
+          if (result.status === 'success') {
+            console.log(`✅ Başarılı: ${result.word} (${result.addedDefinitions} anlam)`);
+          } else if (result.status === 'failed') {
+            console.log(`❌ Başarısız: ${result.word} - ${result.reason}`);
+          }
+
+          // Rate limiting - 2 saniye bekle
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+        } catch (processingError) {
+          console.error('❌ Processing döngüsü hatası:', processingError);
+          this.errorCount++;
+          
+          // Hata durumunda 5 saniye bekle
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+      }
+    } catch (fatalError) {
+      console.error('❌ Fatal processing hatası:', fatalError);
+    } finally {
+      this.isProcessing = false;
+      const endTime = new Date();
+      const totalTime = this.startTime ? (endTime.getTime() - this.startTime.getTime()) / 1000 : 0;
+      
+      console.log(`🏁 Processing durduruldu. ${this.processedCount} kelime işlendi, ${this.errorCount} hata. Toplam süre: ${totalTime}s`);
+    }
+  }
+
+  // Processing'i durdur
+  stopProcessing() {
+    if (!this.isProcessing) {
+      console.log('⚠️ Processing zaten durmuş');
+      return;
+    }
+
+    console.log('🛑 Word processor durduruluyor...');
+    this.isProcessing = false;
+  }
+
+  // Durum bilgisi al
+  getStats() {
+    const now = new Date();
+    const elapsedTime = this.startTime ? (now.getTime() - this.startTime.getTime()) / 1000 : 0;
+
+    return {
+      isProcessing: this.isProcessing,
+      processedCount: this.processedCount,
+      errorCount: this.errorCount,
+      startTime: this.startTime ? this.startTime.toISOString() : null,
+      elapsedTime: elapsedTime,
+      analysisMethod: 'step-by-step'
+    };
+  }
+}
+
+module.exports = WordProcessor;

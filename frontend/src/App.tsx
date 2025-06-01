@@ -30,7 +30,7 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabType>('file');
   const [lastBatchId, setLastBatchId] = useState<string | undefined>();
-  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null); // YENİ
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
   // Tab configurations
   const tabs: TabConfig[] = [
@@ -54,7 +54,7 @@ function App() {
     }
   ];
 
-  // YENİ: System info çek
+  // System info çek
   useEffect(() => {
     const fetchSystemInfo = async () => {
       try {
@@ -69,13 +69,11 @@ function App() {
   }, []);
 
   const handleWordsAdded = (result: BulkAddResponse) => {
-    // Yeni kelimeler eklendi
     setRefreshKey(prev => prev + 1);
     setLastBatchId(result.batchId);
     
     console.log('Kelimeler queue\'ya eklendi:', result);
     
-    // Başarılı işlemden sonra queue sekmesine yönlendir
     if (result.summary.queued > 0) {
       setTimeout(() => {
         setActiveTab('queue');
@@ -84,13 +82,11 @@ function App() {
   };
 
   const handleFileUploaded = (result: FileUploadResponse) => {
-    // Dosya yüklendi
     setRefreshKey(prev => prev + 1);
     setLastBatchId(result.results.batchId);
     
     console.log('Dosya yüklendi:', result);
     
-    // Başarılı yüklemeden sonra queue sekmesine yönlendir
     if (result.results.queued > 0) {
       setTimeout(() => {
         setActiveTab('queue');
@@ -98,12 +94,10 @@ function App() {
     }
   };
 
-  // Tab click handler
   const handleTabClick = (tabId: TabType) => {
     setActiveTab(tabId);
   };
 
-  // Tab content renderer
   const renderTabContent = () => {
     switch (activeTab) {
       case 'file':
@@ -125,7 +119,7 @@ function App() {
 
   return (
     <div className="App">
-      {/* Header - GÜNCELLEME */}
+      {/* Header */}
       <header style={{ 
         backgroundColor: '#282c34', 
         padding: '20px', 
@@ -137,7 +131,6 @@ function App() {
         <p style={{ margin: '0', opacity: 0.8 }}>
           İngilizce Kelime Veritabanı Yöneticisi - {systemInfo?.aiModel || 'Gemini 2.0 Flash'} AI Destekli
         </p>
-        {/* YENİ: System version badge */}
         {systemInfo && (
           <div style={{ marginTop: '8px' }}>
             <span style={{
@@ -154,7 +147,7 @@ function App() {
         )}
       </header>
 
-      {/* Tab Navigation - GÜNCELLEME */}
+      {/* Tab Navigation */}
       <div style={{ 
         backgroundColor: '#f8f9fa',
         borderBottom: '1px solid #dee2e6',
@@ -221,7 +214,7 @@ function App() {
         {renderTabContent()}
       </main>
 
-      {/* Footer - GÜNCELLEME */}
+      {/* Footer */}
       <footer style={{ 
         backgroundColor: '#f8f9fa',
         textAlign: 'center', 
@@ -272,3 +265,33 @@ function App() {
                     ✅ Context-aware çeviri
                   </p>
                 </>
+              )}
+            </div>
+          </div>
+
+          <div style={{ 
+            borderTop: '1px solid #dee2e6', 
+            paddingTop: '15px',
+            fontSize: '12px'
+          }}>
+            <p style={{ margin: '0' }}>
+              🤖 Powered by <strong>Gemini 2.0 Flash</strong> | 
+              🗄️ <strong>Supabase</strong> | 
+              ⚛️ <strong>React + TypeScript</strong> | 
+              🎯 <strong>6-Step Analysis System</strong>
+            </p>
+            
+            {systemInfo && (
+              <p style={{ margin: '5px 0 0 0', opacity: 0.8 }}>
+                Son güncelleme: {new Date(systemInfo.lastUpdated).toLocaleDateString('tr-TR')} | 
+                Çevre: {systemInfo.environment}
+              </p>
+            )}
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
