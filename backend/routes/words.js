@@ -81,7 +81,7 @@ router.post('/bulk-stream', async (req, res) => {
         }
 
         // Sadece harf, tire, apostrof kabul et
-        if (!/^[a-zA-Z\s-']+$/.test(word)) {
+        if (!/^[a-zA-Z\s\-']+$/.test(word)) {
           results.failed.push({
             word,
             reason: 'Sadece İngilizce harfler kabul edilir'
@@ -147,7 +147,7 @@ router.post('/bulk-stream', async (req, res) => {
           })}\n\n`);
           
         } catch (saveError) {
-          console.error('❌ Queue'ya ekleme hatası:', saveError);
+          console.error('❌ Queue\'ya ekleme hatası:', saveError);
           results.failed.push({
             word: word,
             reason: `Veritabanı hatası: ${saveError.message}`
@@ -264,7 +264,7 @@ router.post('/bulk', async (req, res) => {
           continue;
         }
 
-        if (!/^[a-zA-Z\s-']+$/.test(word)) {
+        if (!/^[a-zA-Z\s\-']+$/.test(word)) {
           results.failed.push({
             word,
             reason: 'Sadece İngilizce harfler kabul edilir'
@@ -623,7 +623,7 @@ router.post('/upload-file', async (req, res) => {
       words
         .map(word => word.toString().trim().toLowerCase())
         .filter(word => word.length > 0 && word.length <= 50)
-        .filter(word => /^[a-zA-Z\s-']+$/.test(word)) // Sadece harf, tire, apostrof
+        .filter(word => /^[a-zA-Z\s\-']+$/.test(word)) // Sadece harf, tire, apostrof
     )];
 
     if (cleanWords.length === 0) {
