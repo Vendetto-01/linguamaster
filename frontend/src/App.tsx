@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import WordForm from './components/WordForm';
 import FileUpload from './components/FileUpload';
 import QueueStatus from './components/QueueStatus';
+import { useKeepAlive } from './services/keepAlive';
 import { BulkAddResponse, FileUploadResponse } from './types';
 import './App.css';
 
@@ -18,6 +19,9 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabType>('file');
   const [lastBatchId, setLastBatchId] = useState<string | undefined>();
+
+  // Keep-alive service - Render.com cold start prevention
+  const keepAliveStatus = useKeepAlive();
 
   // Tab configurations
   const tabs: TabConfig[] = [
