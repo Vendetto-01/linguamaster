@@ -62,7 +62,8 @@ app.get('/', (req, res) => {
   res.json({
     status: 'OK',
     message: 'Word Wizard Backend API',
-    version: '1.0.0',
+    version: '2.0',
+    aiModel: 'gemini-2.0-flash-001',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     wordProcessor: {
@@ -83,6 +84,26 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
     wordProcessor: stats
+  });
+});
+
+// System info endpoint
+app.get('/api/system/info', (req, res) => {
+  res.json({
+    appName: 'Word Wizard',
+    version: '2.0',
+    aiModel: 'gemini-2.0-flash-001',
+    lastUpdated: new Date().toISOString(),
+    features: [
+      'Queue-based background processing',
+      'Gemini 2.0 Flash AI integration',
+      'Real-time progress tracking',
+      'Turkish language analysis',
+      'Difficulty level detection',
+      'Multi-meaning support'
+    ],
+    database: 'Supabase PostgreSQL',
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
@@ -158,6 +179,7 @@ app.use('*', (req, res) => {
     availableEndpoints: [
       'GET /',
       'GET /health',
+      'GET /api/system/info',
       'GET /api/words',
       'POST /api/words/bulk',
       'POST /api/words/bulk-stream',
@@ -207,6 +229,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server ${PORT} portunda çalışıyor`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📊 Supabase URL: ${supabaseUrl}`);
+  console.log(`🤖 AI Model: Gemini 2.0 Flash`);
   console.log(`⏰ Başlatma zamanı: ${new Date().toISOString()}`);
   
   // 5 saniye sonra word processor'ı başlat

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import WordForm from './components/WordForm';
 import FileUpload from './components/FileUpload';
 import QueueStatus from './components/QueueStatus';
 import { BulkAddResponse, FileUploadResponse } from './types';
+import { wordApi } from './services/api';
 import './App.css';
 
 type TabType = 'file' | 'manual' | 'queue';
@@ -14,10 +15,22 @@ interface TabConfig {
   description: string;
 }
 
+// YENİ: System Info State
+interface SystemInfo {
+  appName: string;
+  version: string;
+  aiModel: string;
+  lastUpdated: string;
+  features: string[];
+  database: string;
+  environment: string;
+}
+
 function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabType>('file');
   const [lastBatchId, setLastBatchId] = useState<string | undefined>();
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null); // YENİ
 
   // Tab configurations
   const tabs: TabConfig[] = [
@@ -37,9 +50,23 @@ function App() {
       id: 'queue',
       label: 'Queue Durumu',
       icon: '📊',
-      description: 'İşleme durumu ve queue takibi'
+      description: 'Aşamalı işleme durumu ve queue takibi'
     }
   ];
+
+  // YENİ: System info çek
+  useEffect(() => {
+    const fetchSystemInfo = async () => {
+      try {
+        const info = await wordApi.getSystemInfo();
+        setSystemInfo(info);
+      } catch (error) {
+        console.error('System info alınamadı:', error);
+      }
+    };
+
+    fetchSystemInfo();
+  }, []);
 
   const handleWordsAdded = (result: BulkAddResponse) => {
     // Yeni kelimeler eklendi
@@ -98,7 +125,7 @@ function App() {
 
   return (
     <div className="App">
-      {/* Header */}
+      {/* Header - GÜNCELLEME */}
       <header style={{ 
         backgroundColor: '#282c34', 
         padding: '20px', 
@@ -108,11 +135,26 @@ function App() {
       }}>
         <h1 style={{ margin: '0 0 10px 0' }}>🧙‍♂️ Word Wizard</h1>
         <p style={{ margin: '0', opacity: 0.8 }}>
-          İngilizce Kelime Veritabanı Yöneticisi - Gemini AI Destekli
+          İngilizce Kelime Veritabanı Yöneticisi - {systemInfo?.aiModel || 'Gemini 2.0 Flash'} AI Destekli
         </p>
+        {/* YENİ: System version badge */}
+        {systemInfo && (
+          <div style={{ marginTop: '8px' }}>
+            <span style={{
+              backgroundColor: '#007bff',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: '12px',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            }}>
+              v{systemInfo.version} | {systemInfo.environment}
+            </span>
+          </div>
+        )}
       </header>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation - GÜNCELLEME */}
       <div style={{ 
         backgroundColor: '#f8f9fa',
         borderBottom: '1px solid #dee2e6',
@@ -179,7 +221,7 @@ function App() {
         {renderTabContent()}
       </main>
 
-      {/* Footer */}
+      {/* Footer - GÜNCELLEME */}
       <footer style={{ 
         backgroundColor: '#f8f9fa',
         textAlign: 'center', 
@@ -200,76 +242,33 @@ function App() {
                 <strong>Backend:</strong> {process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}
               </p>
               <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                <strong>Veritabanı:</strong> Supabase PostgreSQL
+                <strong>Veritabanı:</strong> {systemInfo?.database || 'Supabase PostgreSQL'}
               </p>
               <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                <strong>AI Engine:</strong> Google Gemini API
+                <strong>AI Engine:</strong> {systemInfo?.aiModel || 'Gemini 2.0 Flash API'}
               </p>
             </div>
 
             <div>
-              <h4 style={{ color: '#495057', marginBottom: '10px' }}>⚡ Yeni Özellikler</h4>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                ✅ Queue tabanlı background processing
-              </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                ✅ Gemini AI entegrasyonu
-              </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                ✅ Real-time progress tracking
-              </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                ✅ Zorluk seviyesi analizi
-              </p>
-            </div>
-
-            <div>
-              <h4 style={{ color: '#495057', marginBottom: '10px' }}>📋 Süreç</h4>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                1️⃣ Kelimeler queue'ya eklenir
-              </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                2️⃣ AI background'da işler
-              </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                3️⃣ Türkçe karşılıklar çekilir
-              </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                4️⃣ Quiz için hazır hale gelir
-              </p>
-            </div>
-          </div>
-
-          <div style={{ 
-            padding: '20px',
-            backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            border: '1px solid #dee2e6'
-          }}>
-            <h4 style={{ color: '#495057', marginBottom: '10px' }}>
-              🤖 Gemini AI ile Gelişmiş Kelime İşleme
-            </h4>
-            <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5' }}>
-              Her kelime için otomatik olarak Türkçe karşılıklar, kelime türleri, 
-              zorluk seviyeleri ve İngilizce örnek cümleler Google Gemini AI tarafından analiz edilir. 
-              Bu sayede daha zengin ve eğitici bir kelime veritabanı oluşturulur.
-            </p>
-          </div>
-
-          <div style={{ 
-            marginTop: '20px',
-            fontSize: '12px',
-            color: '#adb5bd'
-          }}>
-            <p style={{ margin: 0 }}>
-              Word Wizard v2.0 - Gemini AI Edition | 
-              Son güncellenme: {new Date().toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-export default App;
+              <h4 style={{ color: '#495057', marginBottom: '10px' }}>⚡ Aşamalı Analiz Özellikleri</h4>
+              {systemInfo?.features ? (
+                systemInfo.features.slice(0, 4).map((feature, index) => (
+                  <p key={index} style={{ margin: '5px 0', fontSize: '14px' }}>
+                    ✅ {feature}
+                  </p>
+                ))
+              ) : (
+                <>
+                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                    ✅ 6 aşamalı kelime analizi
+                  </p>
+                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                    ✅ Çoklu anlam desteği
+                  </p>
+                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                    ✅ Akıllı zorluk analizi
+                  </p>
+                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                    ✅ Context-aware çeviri
+                  </p>
+                </>

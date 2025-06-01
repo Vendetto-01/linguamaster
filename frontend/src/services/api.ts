@@ -1,7 +1,21 @@
-// frontend/src/services/api.ts
+// frontend/src/services/api.ts - YENİ ŞEMA DESTEKLİ
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
-// API Response Types
+// YENİ: Import updated types
+import type {
+  Word,
+  WordGroup,
+  WordListResponse,
+  WordStats,
+  QueueStats,
+  QueueStatus,
+  BulkAddResponse,
+  FileUploadResponse,
+  RandomWordsResponse,
+  ProcessorStats
+} from '../types';
+
+// API Response Types - AYNI
 export interface QueuedWordResult {
   word: string;
   batchId: string;
@@ -17,116 +31,9 @@ export interface DuplicateWordResult {
   reason: string;
 }
 
-export interface BulkAddResponse {
-  message: string;
-  results: {
-    queued: QueuedWordResult[];
-    failed: FailedWordResult[];
-    duplicate: DuplicateWordResult[];
-  };
-  summary: {
-    queued: number;
-    failed: number;
-    duplicate: number;
-    total: number;
-  };
-  batchId: string;
-  nextStep: string;
-}
-
-export interface FileUploadResponse {
-  message: string;
-  results: {
-    fileName: string;
-    batchId: string;
-    totalWords: number;
-    queued: number;
-    duplicates: number;
-    failed: number;
-  };
-  status: string;
-  nextStep: string;
-}
-
-export interface QueueStatus {
-  batchId: string;
-  pending: number;
-  processing: number;
-  processed: number;
-  failed: number;
-  status: 'processing' | 'completed';
-  lastUpdate: string;
-}
-
-export interface QueueStats {
-  totalPendingWords: number;
-  totalProcessingWords: number;
-  totalFailedWords: number;
-  activeBatches: number;
-  oldestPendingWord: {
-    word: string;
-    created_at: string;
-  } | null;
-  isQueueActive: boolean;
-  processorStats: {
-    isProcessing: boolean;
-    processedCount: number;
-    errorCount: number;
-    startTime: string | null;
-    elapsedTime: number;
-  };
-  lastUpdate: string;
-}
-
-export interface WordStats {
-  totalWords: number;
-  totalDefinitions: number;
-  partOfSpeechStats: Array<{
-    _id: string;
-    count: number;
-  }>;
-  difficultyStats: Array<{
-    _id: string;
-    count: number;
-  }>;
-  queueStats: {
-    pending: number;
-    processing: number;
-    failed: number;
-  };
-  lastUpdated: string;
-  database: string;
-  apiSource: string;
-}
-
-export interface Word {
-  id: number;
-  word: string;
-  turkish_meaning: string;
-  part_of_speech: string;
-  english_example: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  source: string;
-  times_shown: number;
-  times_correct: number;
-  is_active: boolean;
-  created_at: string;
-}
-
-export interface WordListResponse {
-  words: Word[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalWords: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-}
-
-// Tüm API fonksiyonlarını burada topla
+// Tüm API fonksiyonlarını burada topla - GÜNCELLEME
 export const wordApi = {
-  // Kelime ekleme (Queue'ya)
+  // Kelime ekleme (Queue'ya) - AYNI
   addWords: async (words: string[]): Promise<BulkAddResponse> => {
     const response = await fetch(`${API_BASE_URL}/api/words/bulk`, {
       method: 'POST',
@@ -144,7 +51,7 @@ export const wordApi = {
     return response.json();
   },
 
-  // Dosya yükleme
+  // Dosya yükleme - AYNI
   uploadFile: async (words: string[], fileName: string): Promise<FileUploadResponse> => {
     const response = await fetch(`${API_BASE_URL}/api/words/upload-file`, {
       method: 'POST',
@@ -162,18 +69,7 @@ export const wordApi = {
     return response.json();
   },
 
-  // Stream ile kelime ekleme (Real-time progress)
-  addWordsStream: (words: string[]): EventSource => {
-    const eventSource = new EventSource(`${API_BASE_URL}/api/words/bulk-stream`, {
-      // POST data'yı query string olarak gönderemeyiz, bu endpoint'i farklı kullanacağız
-    });
-
-    // Bu endpoint için POST yapmamız gerekiyor, EventSource ile POST yapamayız
-    // Bu yüzden bu fonksiyonu fetch ile yapacağız
-    return eventSource;
-  },
-
-  // Stream endpoint'i için özel fonksiyon
+  // Stream ile kelime ekleme - AYNI
   addWordsStreamPost: async (
     words: string[], 
     onProgress: (data: any) => void,
@@ -233,9 +129,16 @@ export const wordApi = {
     }
   },
 
-  // Kelime listesi getir
-  getWords: async (page = 1, limit = 20, search?: string, difficulty?: string): Promise<WordListResponse> => {
-    let url = `${API_BASE_URL}/api/words?page=${page}&limit=${limit}`;
+  // YENİ: Kelime listesi getir - Gruplu Format Desteği
+  getWords: async (
+    page = 1, 
+    limit = 20, 
+    search?: string, 
+    difficulty?: string,
+    difficultyType: 'initial' | 'final' = 'final',
+    groupByWord: boolean = false
+  ): Promise<WordListResponse> => {
+    let url = `${API_BASE_URL}/api/words?page=${page}&limit=${limit}&difficultyType=${difficultyType}&groupByWord=${groupByWord}`;
     
     if (search) {
       url += `&search=${encodeURIComponent(search)}`;
@@ -254,7 +157,7 @@ export const wordApi = {
     return response.json();
   },
 
-  // İstatistikler getir
+  // YENİ: Gelişmiş istatistikler getir
   getStats: async (): Promise<WordStats> => {
     const response = await fetch(`${API_BASE_URL}/api/words/stats`);
     
@@ -265,7 +168,7 @@ export const wordApi = {
     return response.json();
   },
 
-  // Queue durumu getir (belirli batch için)
+  // Queue durumu getir - AYNI
   getQueueStatus: async (batchId: string): Promise<QueueStatus> => {
     const response = await fetch(`${API_BASE_URL}/api/words/queue-status/${batchId}`);
     
@@ -276,7 +179,7 @@ export const wordApi = {
     return response.json();
   },
 
-  // Genel queue istatistikleri
+  // Genel queue istatistikleri - AYNI
   getQueueStats: async (): Promise<QueueStats> => {
     const response = await fetch(`${API_BASE_URL}/api/words/queue-stats`);
     
@@ -287,9 +190,13 @@ export const wordApi = {
     return response.json();
   },
 
-  // Rastgele kelimeler getir
-  getRandomWords: async (limit = 10, difficulty?: string): Promise<{ words: Word[]; count: number; requested: number }> => {
-    let url = `${API_BASE_URL}/api/words/random?limit=${limit}`;
+  // YENİ: Rastgele kelimeler getir - Gruplu Format
+  getRandomWords: async (
+    limit = 10, 
+    difficulty?: string,
+    groupByWord: boolean = true
+  ): Promise<RandomWordsResponse> => {
+    let url = `${API_BASE_URL}/api/words/random?limit=${limit}&groupByWord=${groupByWord}`;
     
     if (difficulty) {
       url += `&difficulty=${encodeURIComponent(difficulty)}`;
@@ -304,9 +211,31 @@ export const wordApi = {
     return response.json();
   },
 
-  // Processor kontrolü
+  // YENİ: Belirli kelime grubu getir
+  getWordGroup: async (word: string): Promise<WordGroup> => {
+    const response = await fetch(`${API_BASE_URL}/api/words/group/${encodeURIComponent(word)}`);
+    
+    if (!response.ok) {
+      throw new Error('Kelime grubu yüklenemedi');
+    }
+    
+    return response.json();
+  },
+
+  // YENİ: Anlam bazında kelime getir
+  getWordMeaning: async (word: string, meaningId: number): Promise<Word> => {
+    const response = await fetch(`${API_BASE_URL}/api/words/${encodeURIComponent(word)}/meaning/${meaningId}`);
+    
+    if (!response.ok) {
+      throw new Error('Kelime anlamı yüklenemedi');
+    }
+    
+    return response.json();
+  },
+
+  // Processor kontrolü - GÜNCELLEME
   processor: {
-    start: async (): Promise<{ message: string; stats: any }> => {
+    start: async (): Promise<{ message: string; stats: ProcessorStats }> => {
       const response = await fetch(`${API_BASE_URL}/api/processor/start`, {
         method: 'POST',
       });
@@ -318,7 +247,7 @@ export const wordApi = {
       return response.json();
     },
 
-    stop: async (): Promise<{ message: string; stats: any }> => {
+    stop: async (): Promise<{ message: string; stats: ProcessorStats }> => {
       const response = await fetch(`${API_BASE_URL}/api/processor/stop`, {
         method: 'POST',
       });
@@ -330,7 +259,7 @@ export const wordApi = {
       return response.json();
     },
 
-    getStats: async (): Promise<{ stats: any; timestamp: string }> => {
+    getStats: async (): Promise<{ stats: ProcessorStats; timestamp: string }> => {
       const response = await fetch(`${API_BASE_URL}/api/processor/stats`);
       
       if (!response.ok) {
@@ -341,7 +270,26 @@ export const wordApi = {
     }
   },
 
-  // Development endpoint'leri
+  // YENİ: System info endpoint
+  getSystemInfo: async (): Promise<{
+    appName: string;
+    version: string;
+    aiModel: string;
+    lastUpdated: string;
+    features: string[];
+    database: string;
+    environment: string;
+  }> => {
+    const response = await fetch(`${API_BASE_URL}/api/system/info`);
+    
+    if (!response.ok) {
+      throw new Error('System info alınamadı');
+    }
+    
+    return response.json();
+  },
+
+  // Development endpoint'leri - AYNI
   dev: {
     clearAll: async (): Promise<{ message: string }> => {
       const response = await fetch(`${API_BASE_URL}/api/words/clear`, {

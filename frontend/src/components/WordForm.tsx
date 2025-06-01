@@ -1,4 +1,4 @@
-// frontend/src/components/WordForm.tsx
+// frontend/src/components/WordForm.tsx - AŞAMALI ANALİZ DESTEKLİ
 import React, { useState } from 'react';
 import { wordApi } from '../services/api';
 import { BulkAddResponse, WordFormProps, ValidationResult, StreamEvent } from '../types';
@@ -32,7 +32,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
     }
 
     // İngilizce karakter kontrolü
-    const invalidWords = wordList.filter(word => !/^[a-zA-Z\s-']+$/.test(word));
+    const invalidWords = wordList.filter(word => !/^[a-zA-Z\s\-']+$/.test(word));
     if (invalidWords.length > 0) {
       return { 
         isValid: false, 
@@ -106,7 +106,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
               results: data.results,
               summary: data.summary,
               batchId: data.batchId,
-              nextStep: 'Background processing ile Gemini API\'den veriler çekilecek'
+              nextStep: 'Aşamalı background processing ile Gemini 2.0 Flash API\'den veriler çekilecek'
             };
             
             setResult(response);
@@ -163,11 +163,11 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
         padding: '15px',
         marginTop: '15px'
       }}>
-        <h4 style={{ color: '#004085', marginTop: 0 }}>📡 Real-time Progress</h4>
+        <h4 style={{ color: '#004085', marginTop: 0 }}>📡 Real-time Queue İşlemi</h4>
         
         <div style={{ marginBottom: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-            <span>İşlenen: {streamProgress.current}/{streamProgress.total}</span>
+            <span>Queue'ya eklenen: {streamProgress.current}/{streamProgress.total}</span>
             <span>{percentage.toFixed(1)}%</span>
           </div>
           
@@ -189,7 +189,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
 
         {streamProgress.currentWord && (
           <div style={{ fontSize: '14px', color: '#6c757d' }}>
-            Şu an işleniyor: <strong>{streamProgress.currentWord}</strong>
+            Şu an queue'ya ekleniyor: <strong>{streamProgress.currentWord}</strong>
           </div>
         )}
 
@@ -200,13 +200,17 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
             backgroundColor: '#d1ecf1',
             borderRadius: '3px'
           }}>
-            <strong>Tamamlandı!</strong>
+            <strong>Queue'ya ekleme tamamlandı!</strong>
             <br />
             ✅ Queue'ya eklendi: {streamProgress.summary.queued}
             <br />
             ⚠️ Duplicate: {streamProgress.summary.duplicate}
             <br />
             ❌ Başarısız: {streamProgress.summary.failed}
+            <br />
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#0066cc' }}>
+              🤖 Artık Gemini 2.0 Flash aşamalı analiz sürecine geçiliyor...
+            </div>
           </div>
         )}
       </div>
@@ -278,7 +282,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
                 }}>
                   <strong>{item.word}</strong>
                   <small style={{ color: '#666', marginLeft: '10px' }}>
-                    (Batch: {item.batchId.slice(0, 8)}...)
+                    (Aşamalı analiz için hazır)
                   </small>
                 </div>
               ))}
@@ -333,7 +337,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
           </div>
         )}
 
-        {/* Sonraki adım bilgisi */}
+        {/* Sonraki adım bilgisi - GÜNCELLEME */}
         <div style={{
           backgroundColor: '#cce5ff',
           padding: '10px',
@@ -351,7 +355,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
     <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
       <h2>📚 Manuel Kelime Ekleme</h2>
       <p style={{ color: '#666', marginBottom: '20px' }}>
-        Kelimeler queue'ya eklenir ve arka planda Gemini AI ile işlenir
+        Kelimeler queue'ya eklenir ve arka planda <strong>Gemini 2.0 Flash</strong> ile 6 aşamalı analiz edilir
       </p>
       
       <form onSubmit={handleSubmit}>
@@ -367,7 +371,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
             id="words"
             value={words}
             onChange={(e) => setWords(e.target.value)}
-            placeholder="Örnek: apple, book, computer&#10;house&#10;beautiful"
+            placeholder="Örnek: apple, beautiful, computer&#10;house&#10;wonderful"
             rows={6}
             style={{
               width: '100%',
@@ -380,7 +384,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
             disabled={isLoading}
           />
           <small style={{ color: '#666', fontSize: '12px' }}>
-            Maksimum 50 kelime • Sadece İngilizce karakterler
+            Maksimum 50 kelime • Sadece İngilizce karakterler • Her kelime için çoklu anlam analizi yapılacak
           </small>
         </div>
 
@@ -399,7 +403,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
               disabled={isLoading}
               style={{ marginRight: '8px' }}
             />
-            📡 Real-time progress göster (yavaş ama detaylı)
+            📡 Real-time queue progress göster (queue'ya ekleme sürecini izle)
           </label>
         </div>
 
@@ -431,8 +435,8 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
           }}
         >
           {isLoading ? 
-            (useRealTime ? '📡 Stream ile ekleniyor...' : '🔄 Queue\'ya ekleniyor...') : 
-            '➕ Kelimeleri Queue\'ya Ekle'
+            (useRealTime ? '📡 Stream ile queue\'ya ekleniyor...' : '🔄 Queue\'ya ekleniyor...') : 
+            '➕ Aşamalı Analiz için Queue\'ya Ekle'
           }
         </button>
       </form>
@@ -443,7 +447,7 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
       {/* Results */}
       {renderResults()}
 
-      {/* Info Box */}
+      {/* Info Box - GÜNCELLEME */}
       <div style={{
         marginTop: '20px',
         backgroundColor: '#e9ecef',
@@ -452,20 +456,33 @@ const WordForm: React.FC<WordFormProps> = ({ onWordsAdded }) => {
         fontSize: '14px',
         color: '#495057'
       }}>
-        <h4 style={{ margin: '0 0 10px 0' }}>ℹ️ Yeni Sistem Nasıl Çalışır?</h4>
+        <h4 style={{ margin: '0 0 10px 0' }}>ℹ️ Gemini 2.0 Flash Aşamalı Sistem Nasıl Çalışır?</h4>
         <ol style={{ margin: 0, paddingLeft: '20px' }}>
-          <li><strong>Queue'ya Ekleme:</strong> Kelimeler önce queue'ya eklenir</li>
-          <li><strong>AI Processing:</strong> Background worker Gemini AI'dan her kelime için:
-            <ul style={{ marginTop: '5px' }}>
-              <li>Türkçe karşılıkları</li>
-              <li>Kelime türleri (noun, verb, etc.)</li>
-              <li>Zorluk seviyeleri (beginner/intermediate/advanced)</li>
-              <li>İngilizce örnek cümleler</li>
+          <li><strong>Queue'ya Ekleme:</strong> Kelimeler önce işleme kuyruğuna eklenir</li>
+          <li><strong>6 Aşamalı AI Analizi:</strong> Background worker her kelime için:
+            <ul style={{ marginTop: '5px', fontSize: '13px' }}>
+              <li>🎯 İlk zorluk tahmini (beginner/intermediate/advanced)</li>
+              <li>🔍 Tüm anlamları ve kelime türlerini tespit</li>
+              <li>📝 Her anlam için doğal İngilizce örnek cümleler</li>
+              <li>🧠 Context'e göre zorluk seviyesi doğrulama</li>
+              <li>🌍 Cümlelerin akıcı Türkçe çevirisi</li>
+              <li>🎭 Kelime-anlam eşleştirmesi</li>
             </ul>
           </li>
-          <li><strong>Veritabanı:</strong> İşlenen kelimeler ana veritabanına kaydedilir</li>
-          <li><strong>Quiz Hazır:</strong> Kelimeler quiz için kullanıma hazır hale gelir</li>
+          <li><strong>Çoklu Anlam Desteği:</strong> Her kelime için tüm kullanım alanları kaydedilir</li>
+          <li><strong>Quiz Hazır:</strong> Zengin veri seti quiz sistemi için hazır hale gelir</li>
         </ol>
+        
+        <div style={{ 
+          marginTop: '10px',
+          padding: '8px',
+          backgroundColor: '#cce5ff',
+          borderRadius: '3px',
+          fontSize: '13px'
+        }}>
+          <strong>🚀 Örnek:</strong> "run" kelimesi → 5 farklı anlam (koşmak, işletmek, çalışmak, koşu, dizi) + 
+          her biri için örnek cümle + Türkçe çeviri + zorluk analizi
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-// frontend/src/types/index.ts
+// frontend/src/types/index.ts - YENİ ŞEMA İÇİN GÜNCELLEME
 
 // Base API response wrapper
 export interface ApiResponse<T> {
@@ -7,14 +7,20 @@ export interface ApiResponse<T> {
   data: T;
 }
 
-// Word related types
+// YENİ: Güncellenmiş Word interface
 export interface Word {
   id: number;
   word: string;
-  turkish_meaning: string;
+  meaning_id: number; // YENİ: Anlam ID'si
   part_of_speech: string;
+  meaning_description: string; // YENİ: Anlam açıklaması
   english_example: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  turkish_sentence: string; // YENİ: Tam Türkçe cümle
+  turkish_meaning: string; // Kelime karşılığı
+  initial_difficulty: 'beginner' | 'intermediate' | 'advanced' | null; // YENİ: İlk zorluk
+  final_difficulty: 'beginner' | 'intermediate' | 'advanced'; // YENİ: Son zorluk
+  difficulty_reasoning: string; // YENİ: Zorluk gerekçesi
+  analysis_method: string; // YENİ: Analiz metodu
   source: string;
   times_shown: number;
   times_correct: number;
@@ -23,7 +29,18 @@ export interface Word {
   updated_at: string;
 }
 
-// Pending word (queue) types
+// YENİ: Kelime grupları interface (aynı kelime farklı anlamlar)
+export interface WordGroup {
+  word: string;
+  meanings: Word[];
+  totalMeanings: number;
+  difficultyRange: {
+    initial: 'beginner' | 'intermediate' | 'advanced';
+    final: 'beginner' | 'intermediate' | 'advanced';
+  };
+}
+
+// Pending word (queue) types - AYNI
 export interface PendingWord {
   id: number;
   word: string;
@@ -35,7 +52,7 @@ export interface PendingWord {
   updated_at: string;
 }
 
-// Processing log types
+// YENİ: Güncellenmiş Processing log
 export interface WordProcessingLog {
   id: number;
   word: string;
@@ -43,11 +60,11 @@ export interface WordProcessingLog {
   processing_time_ms: number;
   error_message?: string;
   gemini_response?: any;
-  meanings_added: number;
+  meanings_added: number; // Kaç anlam eklendi
   processed_at: string;
 }
 
-// Queue related result types
+// Queue related result types - AYNI
 export interface QueuedWordResult {
   word: string;
   batchId: string;
@@ -63,7 +80,7 @@ export interface DuplicateWordResult {
   reason: string;
 }
 
-// Bulk add response (manuel ekleme)
+// Bulk add response - AYNI
 export interface BulkAddResponse {
   message: string;
   results: {
@@ -81,7 +98,7 @@ export interface BulkAddResponse {
   nextStep: string;
 }
 
-// File upload response
+// File upload response - AYNI
 export interface FileUploadResponse {
   message: string;
   results: {
@@ -96,7 +113,7 @@ export interface FileUploadResponse {
   nextStep: string;
 }
 
-// Stream event types (real-time progress)
+// Stream event types - AYNI
 export interface StreamEventBase {
   type: string;
 }
@@ -177,7 +194,7 @@ export type StreamEvent =
   | StreamErrorEvent 
   | StreamEndEvent;
 
-// Queue status types
+// Queue status types - AYNI
 export interface QueueStatus {
   batchId: string;
   pending: number;
@@ -188,12 +205,14 @@ export interface QueueStatus {
   lastUpdate: string;
 }
 
+// YENİ: Güncellenmiş Processor Stats
 export interface ProcessorStats {
   isProcessing: boolean;
   processedCount: number;
   errorCount: number;
   startTime: string | null;
   elapsedTime: number;
+  analysisMethod: string; // YENİ: step-by-step
 }
 
 export interface QueueStats {
@@ -210,7 +229,7 @@ export interface QueueStats {
   lastUpdate: string;
 }
 
-// Statistics types
+// YENİ: Güncellenmiş Statistics
 export interface PartOfSpeechStat {
   _id: string;
   count: number;
@@ -219,6 +238,7 @@ export interface PartOfSpeechStat {
 export interface DifficultyStat {
   _id: 'beginner' | 'intermediate' | 'advanced';
   count: number;
+  type: 'initial' | 'final'; // YENİ: İlk mi son zorluk mu
 }
 
 export interface QueueStatsMinimal {
@@ -228,36 +248,48 @@ export interface QueueStatsMinimal {
 }
 
 export interface WordStats {
-  totalWords: number;
-  totalDefinitions: number;
+  totalWords: number; // Toplam unique kelime
+  totalDefinitions: number; // Toplam anlam sayısı
+  totalMeanings: number; // YENİ: Toplam meaning sayısı
+  averageMeaningsPerWord: number; // YENİ: Kelime başına ortalama anlam
   partOfSpeechStats: PartOfSpeechStat[];
-  difficultyStats: DifficultyStat[];
+  initialDifficultyStats: DifficultyStat[]; // YENİ: İlk zorluk dağılımı
+  finalDifficultyStats: DifficultyStat[]; // YENİ: Son zorluk dağılımı
+  difficultyChangeStats: { // YENİ: Zorluk değişimi istatistikleri
+    upgraded: number; // beginner → intermediate/advanced
+    downgraded: number; // advanced → intermediate/beginner
+    unchanged: number;
+  };
   queueStats: QueueStatsMinimal;
   lastUpdated: string;
   database: string;
   apiSource: string;
+  analysisMethod: string; // YENİ: step-by-step
 }
 
-// Word list response
+// YENİ: Word list response - gruplu format
 export interface WordListResponse {
   words: Word[];
+  wordGroups: WordGroup[]; // YENİ: Gruplu görünüm
   pagination: {
     currentPage: number;
     totalPages: number;
-    totalWords: number;
+    totalWords: number; // Unique kelime sayısı
+    totalMeanings: number; // Toplam anlam sayısı
     hasNext: boolean;
     hasPrev: boolean;
   };
 }
 
-// Random words response
+// Random words response - GÜNCELLEME
 export interface RandomWordsResponse {
   words: Word[];
+  wordGroups: WordGroup[]; // YENİ: Gruplu format
   count: number;
   requested: number;
 }
 
-// Component props types
+// Component props types - AYNI
 export interface WordFormProps {
   onWordsAdded: (result: BulkAddResponse) => void;
 }
@@ -272,32 +304,54 @@ export interface QueueStatusProps {
   refreshInterval?: number;
 }
 
-// Gemini API related types
-export interface GeminiWordMeaning {
-  turkish_meaning: string;
+// YENİ: Gemini Step Analysis related types
+export interface GeminiStepMeaning {
+  meaning_id: number;
   part_of_speech: string;
-  english_example: string;
+  meaning_description: string;
 }
 
-export interface GeminiWordResponse {
+export interface GeminiStepExample {
+  meaning_id: number;
+  english_sentence: string;
+}
+
+export interface GeminiStepTranslation {
+  meaning_id: number;
+  english_sentence: string;
+  turkish_sentence: string;
+}
+
+export interface GeminiStepMapping {
+  meaning_id: number;
+  english_word: string;
+  turkish_equivalent: string;
+}
+
+export interface GeminiStepResponse {
   word: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  meanings: GeminiWordMeaning[];
+  step1_initial_difficulty: 'beginner' | 'intermediate' | 'advanced';
+  step2_meanings: GeminiStepMeaning[];
+  step3_examples: GeminiStepExample[];
+  step4_final_difficulty: 'beginner' | 'intermediate' | 'advanced';
+  step4_difficulty_reasoning: string;
+  step5_turkish_translations: GeminiStepTranslation[];
+  step6_word_mappings: GeminiStepMapping[];
 }
 
-// Processing result types (backend'den gelecek)
+// Processing result types - GÜNCELLEME
 export interface ProcessingResult {
   status: 'success' | 'failed' | 'queue_empty';
   word?: string;
-  addedDefinitions?: number;
+  addedDefinitions?: number; // Kaç anlam eklendi
   duplicateDefinitions?: number;
-  totalDefinitions?: number;
+  totalDefinitions?: number; // Toplam analiz edilen anlam
   processingTime?: number;
   reason?: string;
   retryCount?: number;
 }
 
-// Upload progress tracking
+// Upload progress tracking - AYNI
 export interface UploadProgress {
   current: number;
   total: number;
@@ -307,23 +361,27 @@ export interface UploadProgress {
   message: string;
 }
 
-// Form validation types
+// Form validation types - AYNI
 export interface ValidationResult {
   isValid: boolean;
   error: string;
   words: string[];
 }
 
-// Filter types
+// YENİ: Word filter - güncellenmiş
 export interface WordFilter {
   search?: string;
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  difficultyType?: 'initial' | 'final'; // YENİ: Hangi zorluk
   partOfSpeech?: string;
+  meaningId?: number; // YENİ: Belirli anlam filtresi
+  analysisMethod?: string; // YENİ: step-by-step vs legacy
   page?: number;
   limit?: number;
+  groupByWord?: boolean; // YENİ: Kelime bazında grupla
 }
 
-// UI State types
+// UI State types - AYNI
 export interface LoadingState {
   isLoading: boolean;
   message?: string;
@@ -334,12 +392,11 @@ export interface ErrorState {
   error?: string;
 }
 
-// Common component state
 export interface ComponentState extends LoadingState, ErrorState {
   data?: any;
 }
 
-// Theme/UI types
+// Theme/UI types - AYNI
 export interface TabConfig {
   id: string;
   label: string;
@@ -347,19 +404,21 @@ export interface TabConfig {
   component: React.ComponentType<any>;
 }
 
-// Event handler types
+// Event handler types - AYNI
 export type StreamEventHandler = (event: StreamEvent) => void;
 export type ProgressEventHandler = (progress: UploadProgress) => void;
 export type ErrorEventHandler = (error: string) => void;
 export type SuccessEventHandler = (result: any) => void;
 
-// Utility types
+// Utility types - GÜNCELLEME
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+export type DifficultyType = 'initial' | 'final'; // YENİ
 export type PartOfSpeech = 'noun' | 'verb' | 'adjective' | 'adverb' | 'preposition' | 'conjunction' | 'interjection';
 export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type QueueEventType = 'word_queued' | 'word_failed' | 'word_duplicate' | 'batch_complete';
+export type AnalysisMethod = 'step-by-step' | 'legacy'; // YENİ
 
-// Configuration types
+// Configuration types - GÜNCELLEME
 export interface AppConfig {
   apiBaseUrl: string;
   maxWordsPerBatch: number;
@@ -370,9 +429,14 @@ export interface AppConfig {
     processorStats: number;
     wordList: number;
   };
+  analysisConfig: { // YENİ
+    maxMeaningsPerWord: number;
+    stepTimeout: number;
+    enableStepByStep: boolean;
+  };
 }
 
-// Environment specific types
+// Environment specific types - AYNI
 export interface Environment {
   NODE_ENV: 'development' | 'production' | 'test';
   REACT_APP_BACKEND_URL?: string;

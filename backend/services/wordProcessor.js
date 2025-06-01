@@ -1,4 +1,4 @@
-// backend/services/wordProcessor.js
+// backend/services/wordProcessor.js - UPDATED FOR NEW SCHEMA
 const axios = require('axios');
 
 class WordProcessor {
@@ -15,41 +15,78 @@ class WordProcessor {
     }
   }
 
-  // Gemini API'den kelime bilgilerini çek
+  // Gemini API'den kelime bilgilerini çek - YENİ AŞAMALI SİSTEM
   async fetchWordFromGeminiAPI(word) {
     try {
-      const prompt = `Analyze the English word "${word}" and provide comprehensive information in Turkish. I need:
+      const prompt = `Analyze the English word "${word}" step by step. Follow these exact steps:
 
-1. The difficulty level of this word for English learners (beginner/intermediate/advanced)
-2. All Turkish meanings/translations of this word
-3. For each Turkish meaning, specify its part of speech (noun, verb, adjective, adverb, preposition, etc.)
-4. For each Turkish meaning, provide a clear example sentence in English that demonstrates the usage
+STEP 1: Initial difficulty assessment
+Determine the difficulty level of this word for English learners (beginner/intermediate/advanced).
 
-Please respond ONLY with a valid JSON object in this exact format:
+STEP 2: Meaning identification  
+Identify all different meanings and uses of this word in English. For each meaning, specify:
+- The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection)
+- A brief description of that specific meaning
+
+STEP 3: Example sentence creation
+For each meaning identified in Step 2, create a clear, natural English example sentence that demonstrates that specific usage.
+
+STEP 4: Context-based difficulty verification
+Look at the example sentences you created. Based on the context and complexity of these sentences, verify or adjust the initial difficulty level.
+
+STEP 5: Turkish translation of sentences
+Translate each English example sentence into natural, fluent Turkish.
+
+STEP 6: Word-to-word mapping
+For each English sentence and its Turkish translation, identify exactly which Turkish word(s) correspond to the original English word being analyzed.
+
+Respond ONLY with a valid JSON object in this exact format:
 {
   "word": "${word}",
-  "difficulty": "beginner|intermediate|advanced",
-  "meanings": [
+  "step1_initial_difficulty": "beginner|intermediate|advanced",
+  "step2_meanings": [
     {
-      "turkish_meaning": "Turkish translation here",
-      "part_of_speech": "noun|verb|adjective|adverb|etc",
-      "english_example": "Example sentence in English using the word ${word}"
+      "meaning_id": 1,
+      "part_of_speech": "noun|verb|adjective|etc",
+      "meaning_description": "brief description of this specific meaning"
+    }
+  ],
+  "step3_examples": [
+    {
+      "meaning_id": 1,
+      "english_sentence": "example sentence in English"
+    }
+  ],
+  "step4_final_difficulty": "beginner|intermediate|advanced",
+  "step4_difficulty_reasoning": "explanation for the final difficulty decision",
+  "step5_turkish_translations": [
+    {
+      "meaning_id": 1,
+      "english_sentence": "same English sentence from step 3",
+      "turkish_sentence": "Turkish translation of the sentence"
+    }
+  ],
+  "step6_word_mappings": [
+    {
+      "meaning_id": 1,
+      "english_word": "${word}",
+      "turkish_equivalent": "the specific Turkish word(s) that correspond to the English word in this context"
     }
   ]
 }
 
 Important rules:
-- Include ALL common meanings of the word
-- Use standard part of speech terms in English (noun, verb, adjective, adverb, preposition, conjunction, interjection)
+- Include ALL common meanings of the word (maximum 6 meanings)
+- Use standard part of speech terms
 - Example sentences must be natural and demonstrate clear usage
-- Difficulty should reflect general English learning progression
-- Return ONLY the JSON, no additional text
+- Turkish translations must be fluent and natural
+- Word mappings should be precise
 - Ensure valid JSON syntax`;
 
-      console.log(`🤖 Gemini API'ye istek gönderiliyor: ${word}`);
+      console.log(`🤖 Gemini 2.0 Flash - Aşamalı analiz başlatılıyor: ${word}`);
 
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${this.geminiApiKey}`,
         {
           contents: [{
             parts: [{
@@ -58,7 +95,7 @@ Important rules:
           }]
         },
         {
-          timeout: 30000, // 30 saniye timeout
+          timeout: 45000, // 45 saniye timeout
           headers: {
             'Content-Type': 'application/json'
           }
@@ -73,12 +110,11 @@ Important rules:
       }
 
       const generatedText = geminiResponse.candidates[0].content.parts[0].text;
-      console.log(`📝 Gemini yanıtı alındı: ${word}`);
+      console.log(`📝 Gemini 2.0 Flash aşamalı analiz tamamlandı: ${word}`);
 
       // JSON parse et
       let parsedData;
       try {
-        // Bazen Gemini markdown formatında yanıt verebilir, temizle
         const cleanedText = generatedText
           .replace(/```json\n?/g, '')
           .replace(/```\n?/g, '')
@@ -91,23 +127,27 @@ Important rules:
         throw new Error(`JSON parse hatası: ${parseError.message}`);
       }
 
-      // Veri doğrulama
-      if (!parsedData.word || !parsedData.difficulty || !parsedData.meanings) {
-        throw new Error('Gemini yanıtında gerekli alanlar eksik');
+      // Veri doğrulama - yeni format
+      if (!parsedData.word || !parsedData.step4_final_difficulty || !parsedData.step2_meanings) {
+        throw new Error('Gemini yanıtında gerekli step alanları eksik');
       }
 
-      if (!Array.isArray(parsedData.meanings) || parsedData.meanings.length === 0) {
+      if (!Array.isArray(parsedData.step2_meanings) || parsedData.step2_meanings.length === 0) {
         throw new Error('Gemini yanıtında geçerli meanings bulunamadı');
       }
 
       // Zorluk seviyesi doğrulama
       const validDifficulties = ['beginner', 'intermediate', 'advanced'];
-      if (!validDifficulties.includes(parsedData.difficulty)) {
-        console.warn(`⚠️ Geçersiz difficulty: ${parsedData.difficulty}, 'intermediate' olarak ayarlanıyor`);
-        parsedData.difficulty = 'intermediate';
+      if (!validDifficulties.includes(parsedData.step4_final_difficulty)) {
+        console.warn(`⚠️ Geçersiz final difficulty: ${parsedData.step4_final_difficulty}, 'intermediate' olarak ayarlanıyor`);
+        parsedData.step4_final_difficulty = 'intermediate';
       }
 
-      console.log(`✅ ${word} başarıyla işlendi: ${parsedData.meanings.length} anlam, zorluk: ${parsedData.difficulty}`);
+      const meaningCount = parsedData.step2_meanings.length;
+      const initialDiff = parsedData.step1_initial_difficulty;
+      const finalDiff = parsedData.step4_final_difficulty;
+      
+      console.log(`✅ ${word} aşamalı analiz başarılı: ${meaningCount} anlam, ${initialDiff} → ${finalDiff}`);
       
       return {
         rawResponse: geminiResponse,
@@ -116,7 +156,6 @@ Important rules:
 
     } catch (error) {
       if (error.response) {
-        // Gemini API hatası
         console.error('❌ Gemini API hatası:', error.response.status, error.response.data);
         throw new Error(`Gemini API hatası: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
       }
@@ -129,42 +168,61 @@ Important rules:
     }
   }
 
-  // Gemini verilerini Supabase formatına dönüştür
+  // Gemini verilerini Supabase formatına dönüştür - YENİ ŞEMA
   parseGeminiDataForSupabase(geminiData, originalWord) {
     const results = [];
     const { parsedData } = geminiData;
     
-    if (!parsedData || !parsedData.meanings) {
+    if (!parsedData || !parsedData.step2_meanings) {
+      console.error('❌ Gemini parsedData eksik veya hatalı');
       return results;
     }
 
-    parsedData.meanings.forEach(meaning => {
-      const wordData = {
-        word: originalWord.toLowerCase(),
-        turkish_meaning: meaning.turkish_meaning,
-        part_of_speech: meaning.part_of_speech.toLowerCase(),
-        english_example: meaning.english_example,
-        difficulty: parsedData.difficulty,
-        source: 'gemini-api',
-        times_shown: 0,
-        times_correct: 0,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      results.push(wordData);
+    console.log(`🔄 ${originalWord} için ${parsedData.step2_meanings.length} anlam işleniyor...`);
+
+    parsedData.step2_meanings.forEach(meaning => {
+      try {
+        const example = parsedData.step3_examples?.find(ex => ex.meaning_id === meaning.meaning_id);
+        const translation = parsedData.step5_turkish_translations?.find(tr => tr.meaning_id === meaning.meaning_id);
+        const mapping = parsedData.step6_word_mappings?.find(map => map.meaning_id === meaning.meaning_id);
+        
+        const wordData = {
+          word: originalWord.toLowerCase(),
+          meaning_id: meaning.meaning_id,
+          part_of_speech: meaning.part_of_speech ? meaning.part_of_speech.toLowerCase() : 'unknown',
+          meaning_description: meaning.meaning_description || 'No description provided',
+          english_example: example ? example.english_sentence : 'No example provided',
+          turkish_sentence: translation ? translation.turkish_sentence : 'Çeviri bulunamadı',
+          turkish_meaning: mapping ? mapping.turkish_equivalent : 'Eşleştirme bulunamadı',
+          initial_difficulty: parsedData.step1_initial_difficulty || null,
+          final_difficulty: parsedData.step4_final_difficulty || 'intermediate',
+          difficulty_reasoning: parsedData.step4_difficulty_reasoning || 'No reasoning provided',
+          analysis_method: 'step-by-step',
+          source: 'gemini-2.0-flash-001',
+          times_shown: 0,
+          times_correct: 0,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        results.push(wordData);
+        console.log(`✅ Anlam ${meaning.meaning_id}: ${meaning.part_of_speech} - ${mapping?.turkish_equivalent || 'N/A'}`);
+        
+      } catch (meaningError) {
+        console.error(`❌ ${originalWord} - meaning_id ${meaning.meaning_id} işlenirken hata:`, meaningError);
+      }
     });
     
+    console.log(`📊 ${originalWord}: ${results.length}/${parsedData.step2_meanings.length} anlam başarıyla işlendi`);
     return results;
   }
 
-  // Tek bir kelimeyi işle
+  // Tek bir kelimeyi işle - GÜNCELLENEN DUPLICATE KONTROL
   async processOneWord() {
     const startTime = Date.now();
     
     try {
-      // Queue'dan bir kelime al
       const { data: pendingWord, error: fetchError } = await this.supabase
         .from('pending_words')
         .select('*')
@@ -175,7 +233,6 @@ Important rules:
 
       if (fetchError) {
         if (fetchError.code === 'PGRST116') {
-          // Queue boş
           return { status: 'queue_empty' };
         }
         throw fetchError;
@@ -185,9 +242,8 @@ Important rules:
         return { status: 'queue_empty' };
       }
 
-      console.log(`🔄 İşleniyor: ${pendingWord.word}`);
+      console.log(`🔄 Aşamalı analiz başlatılıyor: ${pendingWord.word}`);
 
-      // Pending word'ü processing olarak işaretle
       await this.supabase
         .from('pending_words')
         .update({ 
@@ -197,7 +253,6 @@ Important rules:
         .eq('id', pendingWord.id);
 
       try {
-        // Gemini API'den kelime verilerini çek
         const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word);
         const parsedWords = this.parseGeminiDataForSupabase(geminiData, pendingWord.word);
 
@@ -205,18 +260,16 @@ Important rules:
           throw new Error('Gemini\'den alınan veri işlenemedi');
         }
 
-        // Her anlamı words tablosuna kaydet
         let addedCount = 0;
         let duplicateCount = 0;
         
         for (const wordData of parsedWords) {
           try {
-            // Üçlü kombinasyon kontrolü: word + turkish_meaning + part_of_speech
             const { data: existing, error: checkError } = await this.supabase
               .from('words')
               .select('id')
               .eq('word', wordData.word)
-              .eq('turkish_meaning', wordData.turkish_meaning)
+              .eq('meaning_id', wordData.meaning_id)
               .eq('part_of_speech', wordData.part_of_speech)
               .single();
             
@@ -226,30 +279,34 @@ Important rules:
             
             if (existing) {
               duplicateCount++;
-              console.log(`⚠️ Duplicate atlandı: ${wordData.word} - ${wordData.turkish_meaning}`);
+              console.log(`⚠️ Duplicate atlandı: ${wordData.word} (meaning_id: ${wordData.meaning_id})`);
               continue;
             }
             
-            // Yeni kayıt ekle
             const { error: insertError } = await this.supabase
               .from('words')
               .insert([wordData]);
             
             if (insertError) {
+              if (insertError.code === '23505') {
+                duplicateCount++;
+                console.log(`⚠️ DB Unique constraint: ${wordData.word} (meaning_id: ${wordData.meaning_id})`);
+                continue;
+              }
               throw insertError;
             }
             
             addedCount++;
+            console.log(`✅ Eklendi: ${wordData.word} - ${wordData.turkish_meaning} (${wordData.part_of_speech})`);
             
           } catch (saveError) {
-            console.error(`❌ ${wordData.word} (${wordData.part_of_speech}) kaydetme hatası:`, saveError);
+            console.error(`❌ ${wordData.word} (meaning_id: ${wordData.meaning_id}) kaydetme hatası:`, saveError);
             continue;
           }
         }
 
         const processingTime = Date.now() - startTime;
         
-        // Processing log'u kaydet
         await this.supabase
           .from('word_processing_logs')
           .insert([{
@@ -261,7 +318,6 @@ Important rules:
             processed_at: new Date().toISOString()
           }]);
 
-        // Pending'den sil
         await this.supabase
           .from('pending_words')
           .delete()
@@ -281,14 +337,11 @@ Important rules:
 
       } catch (wordError) {
         const processingTime = Date.now() - startTime;
-        
         console.error(`❌ ${pendingWord.word} işlenirken hata:`, wordError.message);
         
-        // Retry logic
         const newRetryCount = (pendingWord.retry_count || 0) + 1;
         
         if (newRetryCount <= 3) {
-          // 3 denemeye kadar tekrar dene
           await this.supabase
             .from('pending_words')
             .update({ 
@@ -301,7 +354,6 @@ Important rules:
           
           console.log(`🔄 ${pendingWord.word} tekrar deneme kuyruğuna eklendi (${newRetryCount}/3)`);
         } else {
-          // Max retry aşıldı, failed olarak işaretle
           await this.supabase
             .from('pending_words')
             .update({ 
@@ -312,7 +364,6 @@ Important rules:
             .eq('id', pendingWord.id);
         }
 
-        // Error log'u kaydet
         await this.supabase
           .from('word_processing_logs')
           .insert([{
@@ -350,54 +401,3 @@ Important rules:
     this.startTime = new Date();
     this.processedCount = 0;
     this.errorCount = 0;
-
-    console.log('🚀 Gemini Word Processing başlatıldı');
-
-    try {
-      while (this.isProcessing) {
-        const result = await this.processOneWord();
-
-        if (result.status === 'queue_empty') {
-          console.log('🏁 Queue boş, processing tamamlandı');
-          break;
-        }
-
-        // Her 5 kelimede bir istatistik yazdır
-        if ((this.processedCount + this.errorCount) % 5 === 0) {
-          const elapsed = (new Date() - this.startTime) / 1000;
-          const rate = (this.processedCount + this.errorCount) / elapsed;
-          console.log(`📊 İşlenen: ${this.processedCount}, Hata: ${this.errorCount}, Hız: ${rate.toFixed(2)} kelime/saniye`);
-        }
-
-        // Gemini API rate limiting - daha uzun bekleme
-        await new Promise(resolve => setTimeout(resolve, 5000)); // 5 saniye bekle
-      }
-
-    } catch (error) {
-      console.error('❌ Processing döngüsü hatası:', error);
-    } finally {
-      this.isProcessing = false;
-      const totalTime = (new Date() - this.startTime) / 1000;
-      console.log(`🏁 Processing tamamlandı - Toplam süre: ${totalTime.toFixed(2)}s, İşlenen: ${this.processedCount}, Hata: ${this.errorCount}`);
-    }
-  }
-
-  // Processing'i durdur
-  stopProcessing() {
-    console.log('🛑 Processing durduruluyor...');
-    this.isProcessing = false;
-  }
-
-  // İstatistikleri al
-  getStats() {
-    return {
-      isProcessing: this.isProcessing,
-      processedCount: this.processedCount,
-      errorCount: this.errorCount,
-      startTime: this.startTime,
-      elapsedTime: this.startTime ? (new Date() - this.startTime) / 1000 : 0
-    };
-  }
-}
-
-module.exports = WordProcessor;
