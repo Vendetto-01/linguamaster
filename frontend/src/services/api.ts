@@ -1,7 +1,6 @@
 // frontend/src/services/api.ts - YENİ ŞEMA DESTEKLİ
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
-// YENİ: Import updated types
+// YENİ: Import updated types (Tüm importlar dosyanın en başında)
 import type {
   Word,
   WordGroup,
@@ -13,7 +12,9 @@ import type {
   FileUploadResponse,
   RandomWordsResponse,
   ProcessorStats
-} from '../types';
+} from '../types'; // '../types' yolunun projenize göre doğru olduğundan emin olun.
+
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
 // API Response Types - AYNI
 export interface QueuedWordResult {
@@ -71,7 +72,7 @@ export const wordApi = {
 
   // Stream ile kelime ekleme - AYNI
   addWordsStreamPost: async (
-    words: string[], 
+    words: string[],
     onProgress: (data: any) => void,
     onComplete: (data: any) => void,
     onError: (error: string) => void
@@ -98,7 +99,7 @@ export const wordApi = {
 
       while (true) {
         const { done, value } = await reader.read();
-        
+
         if (done) break;
 
         const chunk = decoder.decode(value);
@@ -108,13 +109,13 @@ export const wordApi = {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              
+
               if (data.type === 'complete') {
                 onComplete(data);
               } else if (data.type === 'error') {
                 onError(data.message);
               } else if (data.type === 'end') {
-                return;
+                return; // Stream sonlandığında fonksiyondan çık
               } else {
                 onProgress(data);
               }
@@ -131,105 +132,105 @@ export const wordApi = {
 
   // YENİ: Kelime listesi getir - Gruplu Format Desteği
   getWords: async (
-    page = 1, 
-    limit = 20, 
-    search?: string, 
+    page = 1,
+    limit = 20,
+    search?: string,
     difficulty?: string,
     difficultyType: 'initial' | 'final' = 'final',
     groupByWord: boolean = false
   ): Promise<WordListResponse> => {
     let url = `${API_BASE_URL}/api/words?page=${page}&limit=${limit}&difficultyType=${difficultyType}&groupByWord=${groupByWord}`;
-    
+
     if (search) {
       url += `&search=${encodeURIComponent(search)}`;
     }
-    
+
     if (difficulty) {
       url += `&difficulty=${encodeURIComponent(difficulty)}`;
     }
 
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error('Kelimeler yüklenemedi');
     }
-    
+
     return response.json();
   },
 
   // YENİ: Gelişmiş istatistikler getir
   getStats: async (): Promise<WordStats> => {
     const response = await fetch(`${API_BASE_URL}/api/words/stats`);
-    
+
     if (!response.ok) {
       throw new Error('İstatistikler yüklenemedi');
     }
-    
+
     return response.json();
   },
 
   // Queue durumu getir - AYNI
   getQueueStatus: async (batchId: string): Promise<QueueStatus> => {
     const response = await fetch(`${API_BASE_URL}/api/words/queue-status/${batchId}`);
-    
+
     if (!response.ok) {
       throw new Error('Queue durumu alınamadı');
     }
-    
+
     return response.json();
   },
 
   // Genel queue istatistikleri - AYNI
   getQueueStats: async (): Promise<QueueStats> => {
     const response = await fetch(`${API_BASE_URL}/api/words/queue-stats`);
-    
+
     if (!response.ok) {
       throw new Error('Queue istatistikleri alınamadı');
     }
-    
+
     return response.json();
   },
 
   // YENİ: Rastgele kelimeler getir - Gruplu Format
   getRandomWords: async (
-    limit = 10, 
+    limit = 10,
     difficulty?: string,
     groupByWord: boolean = true
   ): Promise<RandomWordsResponse> => {
     let url = `${API_BASE_URL}/api/words/random?limit=${limit}&groupByWord=${groupByWord}`;
-    
+
     if (difficulty) {
       url += `&difficulty=${encodeURIComponent(difficulty)}`;
     }
 
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error('Rastgele kelimeler yüklenemedi');
     }
-    
+
     return response.json();
   },
 
   // YENİ: Belirli kelime grubu getir
   getWordGroup: async (word: string): Promise<WordGroup> => {
     const response = await fetch(`${API_BASE_URL}/api/words/group/${encodeURIComponent(word)}`);
-    
+
     if (!response.ok) {
       throw new Error('Kelime grubu yüklenemedi');
     }
-    
+
     return response.json();
   },
 
   // YENİ: Anlam bazında kelime getir
   getWordMeaning: async (word: string, meaningId: number): Promise<Word> => {
     const response = await fetch(`${API_BASE_URL}/api/words/${encodeURIComponent(word)}/meaning/${meaningId}`);
-    
+
     if (!response.ok) {
       throw new Error('Kelime anlamı yüklenemedi');
     }
-    
+
     return response.json();
   },
 
@@ -239,11 +240,11 @@ export const wordApi = {
       const response = await fetch(`${API_BASE_URL}/api/processor/start`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) {
         throw new Error('Processor başlatılamadı');
       }
-      
+
       return response.json();
     },
 
@@ -251,21 +252,21 @@ export const wordApi = {
       const response = await fetch(`${API_BASE_URL}/api/processor/stop`, {
         method: 'POST',
       });
-      
+
       if (!response.ok) {
         throw new Error('Processor durdurulamadı');
       }
-      
+
       return response.json();
     },
 
     getStats: async (): Promise<{ stats: ProcessorStats; timestamp: string }> => {
       const response = await fetch(`${API_BASE_URL}/api/processor/stats`);
-      
+
       if (!response.ok) {
         throw new Error('Processor istatistikleri alınamadı');
       }
-      
+
       return response.json();
     }
   },
@@ -281,11 +282,11 @@ export const wordApi = {
     environment: string;
   }> => {
     const response = await fetch(`${API_BASE_URL}/api/system/info`);
-    
+
     if (!response.ok) {
       throw new Error('System info alınamadı');
     }
-    
+
     return response.json();
   },
 
@@ -295,11 +296,11 @@ export const wordApi = {
       const response = await fetch(`${API_BASE_URL}/api/words/clear`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         throw new Error('Temizleme işlemi başarısız');
       }
-      
+
       return response.json();
     }
   }
