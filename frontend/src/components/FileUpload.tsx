@@ -1,24 +1,14 @@
 // frontend/src/components/FileUpload.tsx
 import React, { useState, useRef } from 'react';
-
-interface FileUploadProps {
-  onFileUploaded: (result: any) => void;
-}
-
-interface UploadResult {
-  fileName: string;
-  batchId: string;
-  totalWords: number;
-  inserted: number;
-  duplicates: number;
-  failed: number;
-}
+import { wordApi } from '../services/api';
+import { FileUploadProps, FileUploadResponse, UploadProgress } from '../types';
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string>('');
-  const [result, setResult] = useState<UploadResult | null>(null);
+  const [result, setResult] = useState<FileUploadResponse | null>(null);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Dosya içeriğini okuma
@@ -28,13 +18,22 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
       
       reader.onload = (e) => {
         try {
+          setProgress({
+            current: 50,
+            total: 100,
+            percentage: 50,
+            stage: 'reading',
+            message: 'Dosya içeriği okunuyor...'
+          });
+
           const content = e.target?.result as string;
           
           // Her satırı bir kelime olarak ayır
           const words = content
             .split('\n')
             .map(line => line.trim())
-            .filter(line => line.length > 0);
+            .filter(line => line.length > 0)
+            .filter(line => /^[a-zA-Z\s-']+$/.test(line)); // Sadece İngilizce karakterler
             
           resolve(words);
         } catch (err) {
@@ -43,6 +42,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
       };
       
       reader.onerror = () => reject(new Error('Dosya okuma hatası'));
+      
+      setProgress({
+        current: 25,
+        total: 100,
+        percentage: 25,
+        stage: 'reading',
+        message: 'Dosya okunuyor...'
+      });
+      
       reader.readAsText(file, 'utf-8');
     });
   };
@@ -52,47 +60,63 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
     setIsUploading(true);
     setError('');
     setResult(null);
+    setProgress(null);
 
     try {
       console.log('📖 Dosya okunuyor:', file.name);
+      
+      // Dosya boyutu kontrolü
+      if (file.size > 10 * 1024 * 1024) { // 10MB
+        throw new Error('Dosya boyutu 10MB\'dan büyük olamaz');
+      }
       
       // Dosya içeriğini oku
       const words = await readFileContent(file);
       
       if (words.length === 0) {
-        throw new Error('Dosyada kelime bulunamadı');
+        throw new Error('Dosyada geçerli kelime bulunamadı');
       }
+
+      if (words.length > 50000) {
+        throw new Error('Maksimum 50.000 kelime yükleyebilirsiniz');
+      }
+
+      setProgress({
+        current: 75,
+        total: 100,
+        percentage: 75,
+        stage: 'uploading',
+        message: `${words.length} kelime sunucuya gönderiliyor...`
+      });
 
       console.log(`📊 ${words.length} kelime bulundu, sunucuya gönderiliyor...`);
 
       // Backend'e gönder
-      const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+      const uploadResult = await wordApi.uploadFile(words, file.name);
       
-      const response = await fetch(`${API_BASE_URL}/api/words/upload-file`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          words: words,
-          fileName: file.name 
-        }),
+      setProgress({
+        current: 100,
+        total: 100,
+        percentage: 100,
+        stage: 'complete',
+        message: 'Yükleme tamamlandı!'
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Upload hatası');
-      }
-
-      const uploadResult = await response.json();
       console.log('✅ Upload başarılı:', uploadResult);
       
-      setResult(uploadResult.results);
+      setResult(uploadResult);
       onFileUploaded(uploadResult);
 
     } catch (err) {
       console.error('❌ Upload hatası:', err);
       setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
+      setProgress({
+        current: 0,
+        total: 100,
+        percentage: 0,
+        stage: 'error',
+        message: 'Yükleme başarısız!'
+      });
     } finally {
       setIsUploading(false);
     }
@@ -137,9 +161,49 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
     fileInputRef.current?.click();
   };
 
+  // Progress bar component
+  const ProgressBar = () => {
+    if (!progress) return null;
+
+    return (
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ 
+          marginBottom: '10px', 
+          display: 'flex', 
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span style={{ fontSize: '14px', color: '#666' }}>{progress.message}</span>
+          <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{progress.percentage}%</span>
+        </div>
+        <div style={{
+          width: '100%',
+          height: '8px',
+          backgroundColor: '#f0f0f0',
+          borderRadius: '4px',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            width: `${progress.percentage}%`,
+            height: '100%',
+            backgroundColor: progress.stage === 'error' ? '#dc3545' : 
+                           progress.stage === 'complete' ? '#28a745' : '#007bff',
+            transition: 'width 0.3s ease'
+          }} />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
       <h2>📁 Toplu Kelime Yükleme</h2>
+      <p style={{ color: '#666', marginBottom: '20px' }}>
+        Kelimeler queue'ya eklenir ve arka planda Gemini API ile işlenir
+      </p>
+      
+      {/* Progress Bar */}
+      <ProgressBar />
       
       {/* Drop Zone */}
       <div
@@ -159,13 +223,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         onClick={handleBrowseClick}
       >
         <div style={{ fontSize: '48px', marginBottom: '10px' }}>
-          📄
+          {isUploading ? '⏳' : '📄'}
         </div>
         
         {isUploading ? (
           <div>
             <div style={{ fontSize: '18px', color: '#007bff' }}>
-              🔄 Dosya yükleniyor...
+              🔄 Dosya işleniyor...
             </div>
             <div style={{ fontSize: '14px', color: '#666', marginTop: '5px' }}>
               Lütfen bekleyin
@@ -180,7 +244,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
               veya <strong>tıklayarak dosya seçin</strong>
             </div>
             <div style={{ fontSize: '12px', color: '#999', marginTop: '10px' }}>
-              Her satırda bir kelime olmalı • Maksimum 50.000 kelime
+              Her satırda bir kelime • Maksimum 50.000 kelime • Sadece İngilizce karakterler
             </div>
           </div>
         )}
@@ -198,12 +262,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
       {/* Error Message */}
       {error && (
         <div style={{
-          color: 'red',
-          backgroundColor: '#ffebee',
+          color: '#dc3545',
+          backgroundColor: '#f8d7da',
           padding: '15px',
           borderRadius: '5px',
           marginBottom: '20px',
-          border: '1px solid #ffcdd2'
+          border: '1px solid #f5c6cb'
         }}>
           ❌ {error}
         </div>
@@ -212,16 +276,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
       {/* Success Result */}
       {result && (
         <div style={{
-          backgroundColor: '#e8f5e8',
-          border: '1px solid #4caf50',
+          backgroundColor: '#d4edda',
+          border: '1px solid #c3e6cb',
           borderRadius: '5px',
           padding: '20px',
           marginBottom: '20px'
         }}>
-          <h3 style={{ color: '#2e7d32', marginTop: 0 }}>✅ Dosya Başarıyla Yüklendi!</h3>
+          <h3 style={{ color: '#155724', marginTop: 0 }}>✅ Dosya Başarıyla Queue'ya Eklendi!</h3>
           
           <div style={{ marginBottom: '15px' }}>
-            <strong>📁 Dosya:</strong> {result.fileName}
+            <strong>📁 Dosya:</strong> {result.results.fileName}
+            <br />
+            <strong>🆔 Batch ID:</strong> 
+            <code style={{ 
+              backgroundColor: '#f8f9fa', 
+              padding: '2px 6px', 
+              borderRadius: '3px',
+              fontSize: '12px',
+              marginLeft: '5px'
+            }}>
+              {result.results.batchId}
+            </code>
           </div>
           
           <div style={{ 
@@ -232,41 +307,80 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
           }}>
             <div style={{ backgroundColor: '#f1f8e9', padding: '10px', borderRadius: '3px' }}>
               <div style={{ fontWeight: 'bold', color: '#2e7d32' }}>📊 Toplam Kelime</div>
-              <div style={{ fontSize: '24px' }}>{result.totalWords.toLocaleString()}</div>
+              <div style={{ fontSize: '24px' }}>{result.results.totalWords.toLocaleString()}</div>
             </div>
             
             <div style={{ backgroundColor: '#e8f5e8', padding: '10px', borderRadius: '3px' }}>
               <div style={{ fontWeight: 'bold', color: '#2e7d32' }}>✅ Queue'ya Eklendi</div>
-              <div style={{ fontSize: '24px' }}>{result.inserted.toLocaleString()}</div>
+              <div style={{ fontSize: '24px' }}>{result.results.queued.toLocaleString()}</div>
             </div>
             
-            {result.duplicates > 0 && (
+            {result.results.duplicates > 0 && (
               <div style={{ backgroundColor: '#fff3e0', padding: '10px', borderRadius: '3px' }}>
-                <div style={{ fontWeight: 'bold', color: '#f57c00' }}>⚠️ Zaten Mevcut</div>
-                <div style={{ fontSize: '24px' }}>{result.duplicates.toLocaleString()}</div>
+                <div style={{ fontWeight: 'bold', color: '#f57c00' }}>⚠️ Zaten Queue'da</div>
+                <div style={{ fontSize: '24px' }}>{result.results.duplicates.toLocaleString()}</div>
               </div>
             )}
             
-            {result.failed > 0 && (
+            {result.results.failed > 0 && (
               <div style={{ backgroundColor: '#ffebee', padding: '10px', borderRadius: '3px' }}>
                 <div style={{ fontWeight: 'bold', color: '#d32f2f' }}>❌ Başarısız</div>
-                <div style={{ fontSize: '24px' }}>{result.failed.toLocaleString()}</div>
+                <div style={{ fontSize: '24px' }}>{result.results.failed.toLocaleString()}</div>
               </div>
             )}
           </div>
 
           <div style={{ 
-            backgroundColor: '#bbdefb', 
-            padding: '10px', 
-            borderRadius: '3px',
+            backgroundColor: '#cce5ff', 
+            padding: '15px', 
+            borderRadius: '5px',
             fontSize: '14px',
-            color: '#1565c0'
+            color: '#0066cc'
           }}>
-            🚀 <strong>Sonraki Adım:</strong> Kelimeler arka planda işlenmeye başlayacak. 
-            Progress'i takip etmek için "Queue Durumu" sekmesini kontrol edebilirsiniz.
+            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+              🤖 <strong>Sonraki Adım:</strong>
+            </div>
+            <p style={{ margin: '0 0 8px 0' }}>
+              Kelimeler arka planda <strong>Gemini AI</strong> ile işlenmeye başlayacak. 
+              Her kelime için Türkçe karşılıklar, kelime türleri ve örnek cümleler çekilecek.
+            </p>
+            <p style={{ margin: 0 }}>
+              📊 Progress'i takip etmek için <strong>"Queue Durumu"</strong> sekmesini kontrol edebilirsiniz.
+            </p>
+          </div>
+
+          {/* Processing Status */}
+          <div style={{
+            marginTop: '15px',
+            padding: '10px',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '3px',
+            fontSize: '12px',
+            color: '#666'
+          }}>
+            <div><strong>Status:</strong> {result.status}</div>
+            <div><strong>Message:</strong> {result.nextStep}</div>
+            <div><strong>Timestamp:</strong> {new Date().toLocaleString()}</div>
           </div>
         </div>
       )}
+
+      {/* Info Box */}
+      <div style={{
+        backgroundColor: '#e9ecef',
+        padding: '15px',
+        borderRadius: '5px',
+        fontSize: '14px',
+        color: '#495057'
+      }}>
+        <h4 style={{ margin: '0 0 10px 0' }}>ℹ️ Nasıl Çalışır?</h4>
+        <ol style={{ margin: 0, paddingLeft: '20px' }}>
+          <li>Dosyanızdaki kelimeler queue'ya eklenir</li>
+          <li>Background worker her kelime için Gemini AI'dan bilgi çeker</li>
+          <li>Türkçe karşılıklar, zorluk seviyeleri ve örnek cümleler veritabanına kaydedilir</li>
+          <li>İşlem tamamlandığında kelimeler quiz için hazır hale gelir</li>
+        </ol>
+      </div>
     </div>
   );
 };

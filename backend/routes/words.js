@@ -1,71 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
-
-// Dictionary API'den kelime bilgilerini çek
-async function fetchWordFromAPI(word) {
-  try {
-    const response = await axios.get(
-      `https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`,
-      { timeout: 30000 } // 30 saniye timeout
-    );
-    
-    return response.data;
-  } catch (error) {
-    if (error.response && error.response.status === 404) {
-      throw new Error(`Kelime bulunamadı: ${word}`);
-    }
-    if (error.code === 'ECONNABORTED') {
-      throw new Error(`Zaman aşımı: ${word}`);
-    }
-    throw new Error(`API hatası: ${error.message}`);
-  }
-}
-
-// Kelime verilerini parse et ve Supabase formatına dönüştür
-function parseWordData(apiData, originalWord) {
-  const results = [];
-  
-  if (!apiData || !Array.isArray(apiData) || apiData.length === 0) {
-    return results;
-  }
-  
-  apiData.forEach(entry => {
-    const word = entry.word || originalWord;
-    const phonetic = entry.phonetic || '';
-    
-    if (entry.meanings && Array.isArray(entry.meanings)) {
-      entry.meanings.forEach(meaning => {
-        const partOfSpeech = meaning.partOfSpeech || 'unknown';
-        
-        if (meaning.definitions && Array.isArray(meaning.definitions)) {
-          meaning.definitions.forEach(def => {
-            const wordData = {
-              word: word.toLowerCase(),
-              part_of_speech: partOfSpeech.toLowerCase(),
-              definition: def.definition,
-              phonetic: phonetic || null,
-              example: def.example || null,
-              synonyms: meaning.synonyms || [],
-              antonyms: meaning.antonyms || [],
-              source: 'dictionary-api',
-              times_shown: 0,
-              times_correct: 0,
-              difficulty: 'medium',
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            };
-            
-            results.push(wordData);
-          });
-        }
-      });
-    }
-  });
-  
-  return results;
-}
 
 // POST /api/words/bulk-stream - Real-time progress ile toplu kelime ekleme
 router.post('/bulk-stream', async (req, res) => {
@@ -96,9 +30,9 @@ router.post('/bulk-stream', async (req, res) => {
     });
 
     const results = {
-      success: [],
-      failed: [],
+      queued: [],
       duplicate: [],
+      failed: [],
       total: words.length
     };
 
@@ -106,12 +40,15 @@ router.post('/bulk-stream', async (req, res) => {
     res.write(`data: ${JSON.stringify({
       type: 'start',
       total: words.length,
-      message: 'Kelime işleme başladı...'
+      message: 'Kelimeler queue\'ya ekleniyor...'
     })}\n\n`);
 
-    // Her kelime için API'den veri çek
+    // Batch ID oluştur
+    const batchId = require('crypto').randomUUID();
+
+    // Her kelime için queue'ya ekle
     for (let i = 0; i < words.length; i++) {
-      const word = words[i];
+      const word = words[i].toString().trim().toLowerCase();
       
       try {
         // Progress update gönder
@@ -120,26 +57,40 @@ router.post('/bulk-stream', async (req, res) => {
           current: i + 1,
           total: words.length,
           currentWord: word,
-          message: `İşleniyor: ${word}`
+          message: `Queue'ya ekleniyor: ${word}`
         })}\n\n`);
 
-        console.log(`📖 İşleniyor: ${word} (${i + 1}/${words.length})`);
+        console.log(`📝 Queue'ya ekleniyor: ${word} (${i + 1}/${words.length})`);
         
-        // API'den kelime verilerini çek
-        const apiData = await fetchWordFromAPI(word);
-        const parsedWords = parseWordData(apiData, word);
-        
-        if (parsedWords.length === 0) {
+        // Kelime validasyonu
+        if (!word || word.length === 0 || word.length > 50) {
           results.failed.push({
             word,
-            reason: 'API\'den veri alınamadı'
+            reason: 'Geçersiz kelime formatı'
           });
           
-          // Başarısız kelime update'i gönder
           res.write(`data: ${JSON.stringify({
             type: 'word_failed',
             word: word,
-            reason: 'API\'den veri alınamadı',
+            reason: 'Geçersiz kelime formatı',
+            current: i + 1,
+            total: words.length
+          })}\n\n`);
+          
+          continue;
+        }
+
+        // Sadece harf, tire, apostrof kabul et
+        if (!/^[a-zA-Z\s-']+$/.test(word)) {
+          results.failed.push({
+            word,
+            reason: 'Sadece İngilizce harfler kabul edilir'
+          });
+          
+          res.write(`data: ${JSON.stringify({
+            type: 'word_failed',
+            word: word,
+            reason: 'Sadece İngilizce harfler kabul edilir',
             current: i + 1,
             total: words.length
           })}\n\n`);
@@ -147,100 +98,69 @@ router.post('/bulk-stream', async (req, res) => {
           continue;
         }
         
-        // Her anlam için Supabase'e kaydet
-        let wordProcessed = false;
-        for (const wordData of parsedWords) {
-          try {
-            // Önce aynı kombinasyonun var olup olmadığını kontrol et
-            const { data: existing, error: checkError } = await req.supabase
-              .from('words')
-              .select('id')
-              .eq('word', wordData.word)
-              .eq('part_of_speech', wordData.part_of_speech)
-              .eq('definition', wordData.definition)
-              .single();
-            
-            if (checkError && checkError.code !== 'PGRST116') {
-              throw checkError;
-            }
-            
-            if (existing) {
-              // Duplicate
-              if (!wordProcessed) {
-                results.duplicate.push({
-                  word: wordData.word,
-                  partOfSpeech: wordData.part_of_speech,
-                  reason: 'Bu kelime + anlam kombinasyonu zaten mevcut'
-                });
-                
-                // Duplicate update gönder
-                res.write(`data: ${JSON.stringify({
-                  type: 'word_duplicate',
-                  word: wordData.word,
-                  partOfSpeech: wordData.part_of_speech,
-                  current: i + 1,
-                  total: words.length
-                })}\n\n`);
-                
-                wordProcessed = true;
-              }
-              continue;
-            }
-            
-            // Yeni kayıt ekle
-            const { data: insertData, error: insertError } = await req.supabase
-              .from('words')
-              .insert([wordData])
-              .select()
-              .single();
-            
-            if (insertError) {
-              throw insertError;
-            }
-            
-            results.success.push({
-              word: wordData.word,
-              partOfSpeech: wordData.part_of_speech,
-              definition: wordData.definition.substring(0, 100) + '...'
-            });
-            
-            // Başarılı kelime update'i gönder
-            res.write(`data: ${JSON.stringify({
-              type: 'word_success',
-              word: wordData.word,
-              partOfSpeech: wordData.part_of_speech,
-              definition: wordData.definition.substring(0, 100) + '...',
-              current: i + 1,
-              total: words.length
-            })}\n\n`);
-            
-            wordProcessed = true;
-            break; // İlk başarılı kayıttan sonra bu kelime için dur
-            
-          } catch (saveError) {
-            console.error('❌ Kelime kaydetme hatası:', saveError);
-            if (!wordProcessed) {
-              results.failed.push({
-                word: wordData.word,
-                reason: `Veritabanı hatası: ${saveError.message}`
+        // Pending words'e ekle
+        try {
+          const { data: insertData, error: insertError } = await req.supabase
+            .from('pending_words')
+            .insert([{
+              word: word,
+              upload_batch_id: batchId,
+              status: 'pending',
+              created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+          
+          if (insertError) {
+            // Duplicate key hatası kontrolü
+            if (insertError.code === '23505') {
+              results.duplicate.push({
+                word: word,
+                reason: 'Bu kelime zaten queue\'da'
               });
               
-              // Başarısız kayıt update'i gönder
               res.write(`data: ${JSON.stringify({
-                type: 'word_failed',
-                word: wordData.word,
-                reason: `Veritabanı hatası: ${saveError.message}`,
+                type: 'word_duplicate',
+                word: word,
+                reason: 'Bu kelime zaten queue\'da',
                 current: i + 1,
                 total: words.length
               })}\n\n`);
               
-              wordProcessed = true;
+              continue;
             }
+            throw insertError;
           }
+          
+          results.queued.push({
+            word: word,
+            batchId: batchId
+          });
+          
+          // Başarılı kelime update'i gönder
+          res.write(`data: ${JSON.stringify({
+            type: 'word_queued',
+            word: word,
+            batchId: batchId,
+            current: i + 1,
+            total: words.length
+          })}\n\n`);
+          
+        } catch (saveError) {
+          console.error('❌ Queue'ya ekleme hatası:', saveError);
+          results.failed.push({
+            word: word,
+            reason: `Veritabanı hatası: ${saveError.message}`
+          });
+          
+          res.write(`data: ${JSON.stringify({
+            type: 'word_failed',
+            word: word,
+            reason: `Veritabanı hatası: ${saveError.message}`,
+            current: i + 1,
+            total: words.length
+          })}\n\n`);
         }
-        
-        // Rate limiting için kısa bekleme
-        await new Promise(resolve => setTimeout(resolve, 100));
         
       } catch (wordError) {
         results.failed.push({
@@ -248,7 +168,6 @@ router.post('/bulk-stream', async (req, res) => {
           reason: wordError.message
         });
         
-        // Kelime hatası update'i gönder
         res.write(`data: ${JSON.stringify({
           type: 'word_failed',
           word: word,
@@ -261,7 +180,7 @@ router.post('/bulk-stream', async (req, res) => {
 
     // Tamamlanma mesajı gönder
     const summary = {
-      success: results.success.length,
+      queued: results.queued.length,
       failed: results.failed.length,
       duplicate: results.duplicate.length,
       total: results.total
@@ -271,17 +190,25 @@ router.post('/bulk-stream', async (req, res) => {
       type: 'complete',
       results,
       summary,
-      message: 'Toplu kelime ekleme işlemi tamamlandı'
+      batchId: batchId,
+      message: 'Kelimeler queue\'ya eklendi, background processing başlayacak'
     })}\n\n`);
 
     // Bağlantıyı kapat
     res.write(`data: ${JSON.stringify({ type: 'end' })}\n\n`);
     res.end();
+
+    // Background processor'ı başlat (eğer çalışmıyorsa)
+    if (results.queued.length > 0 && !req.wordProcessor.getStats().isProcessing) {
+      console.log('🚀 Background processor başlatılıyor...');
+      req.wordProcessor.startProcessing().catch(error => {
+        console.error('❌ Background processor başlatma hatası:', error);
+      });
+    }
     
   } catch (error) {
     console.error('❌ Toplu kelime ekleme hatası:', error);
     
-    // Hata mesajı gönder
     res.write(`data: ${JSON.stringify({
       type: 'error',
       error: 'Sunucu hatası',
@@ -312,84 +239,66 @@ router.post('/bulk', async (req, res) => {
     }
     
     const results = {
-      success: [],
-      failed: [],
+      queued: [],
       duplicate: [],
+      failed: [],
       total: words.length
     };
+
+    // Batch ID oluştur
+    const batchId = require('crypto').randomUUID();
     
-    // Her kelime için API'den veri çek
-    for (const word of words) {
+    // Her kelime için queue'ya ekle
+    for (const wordInput of words) {
+      const word = wordInput.toString().trim().toLowerCase();
+      
       try {
-        console.log(`📖 İşleniyor: ${word}`);
+        console.log(`📝 Queue'ya ekleniyor: ${word}`);
         
-        // API'den kelime verilerini çek
-        const apiData = await fetchWordFromAPI(word);
-        const parsedWords = parseWordData(apiData, word);
-        
-        if (parsedWords.length === 0) {
+        // Kelime validasyonu
+        if (!word || word.length === 0 || word.length > 50) {
           results.failed.push({
             word,
-            reason: 'API\'den veri alınamadı'
+            reason: 'Geçersiz kelime formatı'
+          });
+          continue;
+        }
+
+        if (!/^[a-zA-Z\s-']+$/.test(word)) {
+          results.failed.push({
+            word,
+            reason: 'Sadece İngilizce harfler kabul edilir'
           });
           continue;
         }
         
-        // Her anlam için Supabase'e kaydet
-        for (const wordData of parsedWords) {
-          try {
-            // Önce aynı kombinasyonun var olup olmadığını kontrol et
-            const { data: existing, error: checkError } = await req.supabase
-              .from('words')
-              .select('id')
-              .eq('word', wordData.word)
-              .eq('part_of_speech', wordData.part_of_speech)
-              .eq('definition', wordData.definition)
-              .single();
-            
-            if (checkError && checkError.code !== 'PGRST116') {
-              // Başka bir hata varsa
-              throw checkError;
-            }
-            
-            if (existing) {
-              // Duplicate
-              results.duplicate.push({
-                word: wordData.word,
-                partOfSpeech: wordData.part_of_speech,
-                reason: 'Bu kelime + anlam kombinasyonu zaten mevcut'
-              });
-              continue;
-            }
-            
-            // Yeni kayıt ekle
-            const { data: insertData, error: insertError } = await req.supabase
-              .from('words')
-              .insert([wordData])
-              .select()
-              .single();
-            
-            if (insertError) {
-              throw insertError;
-            }
-            
-            results.success.push({
-              word: wordData.word,
-              partOfSpeech: wordData.part_of_speech,
-              definition: wordData.definition.substring(0, 100) + '...'
+        // Pending words'e ekle
+        const { data: insertData, error: insertError } = await req.supabase
+          .from('pending_words')
+          .insert([{
+            word: word,
+            upload_batch_id: batchId,
+            status: 'pending',
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .single();
+        
+        if (insertError) {
+          if (insertError.code === '23505') {
+            results.duplicate.push({
+              word: word,
+              reason: 'Bu kelime zaten queue\'da'
             });
-            
-          } catch (saveError) {
-            console.error('❌ Kelime kaydetme hatası:', saveError);
-            results.failed.push({
-              word: wordData.word,
-              reason: `Veritabanı hatası: ${saveError.message}`
-            });
+            continue;
           }
+          throw insertError;
         }
         
-        // Rate limiting için kısa bekleme
-        await new Promise(resolve => setTimeout(resolve, 100));
+        results.queued.push({
+          word: word,
+          batchId: batchId
+        });
         
       } catch (wordError) {
         results.failed.push({
@@ -399,15 +308,25 @@ router.post('/bulk', async (req, res) => {
       }
     }
     
+    // Background processor'ı başlat (eğer çalışmıyorsa)
+    if (results.queued.length > 0 && !req.wordProcessor.getStats().isProcessing) {
+      console.log('🚀 Background processor başlatılıyor...');
+      req.wordProcessor.startProcessing().catch(error => {
+        console.error('❌ Background processor başlatma hatası:', error);
+      });
+    }
+
     res.json({
-      message: 'Toplu kelime ekleme işlemi tamamlandı',
+      message: 'Kelimeler queue\'ya eklendi',
       results,
       summary: {
-        success: results.success.length,
+        queued: results.queued.length,
         failed: results.failed.length,
         duplicate: results.duplicate.length,
         total: results.total
-      }
+      },
+      batchId: batchId,
+      nextStep: 'Background processing ile Gemini API\'den veriler çekilecek'
     });
     
   } catch (error) {
@@ -429,14 +348,19 @@ router.get('/', async (req, res) => {
     
     let query = req.supabase
       .from('words')
-      .select('id, word, part_of_speech, definition, phonetic, example, created_at', { count: 'exact' })
+      .select('id, word, turkish_meaning, part_of_speech, english_example, difficulty, created_at', { count: 'exact' })
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .range(from, to);
     
     // Arama filtresi
     if (req.query.search) {
-      query = query.or(`word.ilike.%${req.query.search}%,definition.ilike.%${req.query.search}%`);
+      query = query.or(`word.ilike.%${req.query.search}%,turkish_meaning.ilike.%${req.query.search}%`);
+    }
+
+    // Zorluk filtresi
+    if (req.query.difficulty) {
+      query = query.eq('difficulty', req.query.difficulty);
     }
     
     const { data: words, error, count } = await query;
@@ -524,7 +448,7 @@ router.get('/stats', async (req, res) => {
     let difficultyStats = [];
     if (!diffError && difficultyData) {
       const grouped = difficultyData.reduce((acc, item) => {
-        const diff = item.difficulty || 'medium';
+        const diff = item.difficulty || 'intermediate';
         acc[diff] = (acc[diff] || 0) + 1;
         return acc;
       }, {});
@@ -532,14 +456,36 @@ router.get('/stats', async (req, res) => {
       difficultyStats = Object.entries(grouped)
         .map(([difficulty, count]) => ({ _id: difficulty, count }));
     }
+
+    // Queue istatistikleri
+    const { count: pendingCount, error: pendingError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
+    const { count: processingCount, error: processingError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'processing');
+
+    const { count: failedCount, error: failedError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'failed');
     
     res.json({
       totalWords: totalWords || 0,
       totalDefinitions: totalWords || 0,
       partOfSpeechStats,
       difficultyStats,
+      queueStats: {
+        pending: pendingCount || 0,
+        processing: processingCount || 0,
+        failed: failedCount || 0
+      },
       lastUpdated: new Date().toISOString(),
-      database: 'Supabase PostgreSQL'
+      database: 'Supabase PostgreSQL',
+      apiSource: 'Gemini API'
     });
     
   } catch (error) {
@@ -551,8 +497,10 @@ router.get('/stats', async (req, res) => {
         totalDefinitions: 0,
         partOfSpeechStats: [],
         difficultyStats: [],
+        queueStats: { pending: 0, processing: 0, failed: 0 },
         lastUpdated: new Date().toISOString(),
         database: 'Supabase PostgreSQL',
+        apiSource: 'Gemini API',
         message: 'Tablo henüz oluşturulmamış'
       });
     }
@@ -568,7 +516,7 @@ router.get('/stats', async (req, res) => {
 router.get('/random', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
-    const difficulty = req.query.difficulty; // easy, medium, hard
+    const difficulty = req.query.difficulty; // beginner, intermediate, advanced
     
     let query = req.supabase
       .from('words')
@@ -614,17 +562,30 @@ router.delete('/clear', async (req, res) => {
       });
     }
     
-    const { error } = await req.supabase
+    // Words tablosunu temizle
+    const { error: wordsError } = await req.supabase
       .from('words')
       .delete()
       .neq('id', 0); // Tüm kayıtları sil
+
+    // Pending words tablosunu temizle
+    const { error: pendingError } = await req.supabase
+      .from('pending_words')
+      .delete()
+      .neq('id', 0);
+
+    // Processing logs'u temizle
+    const { error: logsError } = await req.supabase
+      .from('word_processing_logs')
+      .delete()
+      .neq('id', 0);
     
-    if (error) {
-      throw error;
+    if (wordsError || pendingError || logsError) {
+      throw wordsError || pendingError || logsError;
     }
     
     res.json({
-      message: 'Tüm kelimeler silindi',
+      message: 'Tüm kelimeler ve queue temizlendi',
       database: 'Supabase'
     });
     
@@ -678,10 +639,12 @@ router.post('/upload-file', async (req, res) => {
     // Pending words tablosuna toplu ekleme
     const pendingWordsData = cleanWords.map(word => ({
       word: word,
-      upload_batch_id: batchId
+      upload_batch_id: batchId,
+      status: 'pending',
+      created_at: new Date().toISOString()
     }));
 
-    console.log(`📁 ${fileName || 'Unknown'} dosyasından ${cleanWords.length} kelime işleniyor...`);
+    console.log(`📁 ${fileName || 'Unknown'} dosyasından ${cleanWords.length} kelime queue'ya ekleniyor...`);
 
     // Supabase'e toplu ekleme (1000'lik gruplar halinde)
     const batchSize = 1000;
@@ -712,24 +675,31 @@ router.post('/upload-file', async (req, res) => {
         
       } catch (batchError) {
         console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} hatası:`, batchError);
-        // Bu batch'i atla, devam et
         continue;
       }
     }
 
+    // Background processor'ı başlat (eğer çalışmıyorsa)
+    if (totalInserted > 0 && !req.wordProcessor.getStats().isProcessing) {
+      console.log('🚀 Background processor başlatılıyor...');
+      req.wordProcessor.startProcessing().catch(error => {
+        console.error('❌ Background processor başlatma hatası:', error);
+      });
+    }
+
     // Sonuçları döndür
     res.json({
-      message: 'Dosya başarıyla yüklendi ve işlenmeye hazır',
+      message: 'Dosya başarıyla yüklendi ve queue\'ya eklendi',
       results: {
         fileName: fileName || 'Unknown',
         batchId: batchId,
         totalWords: cleanWords.length,
-        inserted: totalInserted,
+        queued: totalInserted,
         duplicates: duplicateCount,
         failed: cleanWords.length - totalInserted - duplicateCount
       },
-      status: 'uploaded',
-      nextStep: 'Background processing başlayacak'
+      status: 'queued',
+      nextStep: 'Background processing ile Gemini API\'den veriler çekilecek'
     });
 
     console.log(`🎉 Dosya yükleme tamamlandı: ${totalInserted} kelime queue'ya eklendi`);
@@ -752,37 +722,44 @@ router.get('/queue-status/:batchId', async (req, res) => {
     const { count: remainingCount, error: countError } = await req.supabase
       .from('pending_words')
       .select('*', { count: 'exact', head: true })
-      .eq('upload_batch_id', batchId);
+      .eq('upload_batch_id', batchId)
+      .eq('status', 'pending');
 
     if (countError) {
       throw countError;
     }
 
-    // Bu batch'ten işlenmiş kelime sayısı
+    // İşlenmiş kelime sayısı (bu batch'ten)
     const { count: processedCount, error: processedError } = await req.supabase
-      .from('words')
+      .from('word_processing_logs')
       .select('*', { count: 'exact', head: true })
-      .eq('source', 'file-upload')
-      .like('created_at', `%${new Date().toISOString().split('T')[0]}%`); // Bugün eklenenler
+      .eq('status', 'success')
+      .gte('processed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Son 24 saat
 
     if (processedError && processedError.code !== 'PGRST116') {
       throw processedError;
     }
 
-    // Genel queue istatistikleri
-    const { count: totalPendingCount, error: totalCountError } = await req.supabase
+    // Başarısız kelime sayısı
+    const { count: failedCount, error: failedError } = await req.supabase
       .from('pending_words')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('upload_batch_id', batchId)
+      .eq('status', 'failed');
 
-    if (totalCountError) {
-      throw totalCountError;
-    }
+    // Processing durumu
+    const { count: processingCount, error: processingCountError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('upload_batch_id', batchId)
+      .eq('status', 'processing');
 
     res.json({
       batchId,
-      remaining: remainingCount || 0,
+      pending: remainingCount || 0,
+      processing: processingCount || 0,
       processed: processedCount || 0,
-      totalPendingInQueue: totalPendingCount || 0,
+      failed: failedCount || 0,
       status: (remainingCount || 0) > 0 ? 'processing' : 'completed',
       lastUpdate: new Date().toISOString()
     });
@@ -802,10 +779,23 @@ router.get('/queue-stats', async (req, res) => {
     // Toplam pending kelimeler
     const { count: totalPending, error: pendingError } = await req.supabase
       .from('pending_words')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
 
-    if (pendingError) {
-      throw pendingError;
+    // Processing kelimeler
+    const { count: totalProcessing, error: processingError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'processing');
+
+    // Failed kelimeler
+    const { count: totalFailed, error: failedError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'failed');
+
+    if (pendingError || processingError || failedError) {
+      throw pendingError || processingError || failedError;
     }
 
     // Batch sayısı
@@ -824,15 +814,22 @@ router.get('/queue-stats', async (req, res) => {
     const { data: oldestWord, error: oldestError } = await req.supabase
       .from('pending_words')
       .select('created_at, word')
+      .eq('status', 'pending')
       .order('created_at', { ascending: true })
       .limit(1)
       .single();
 
+    // Processor durumu
+    const processorStats = req.wordProcessor.getStats();
+
     res.json({
       totalPendingWords: totalPending || 0,
+      totalProcessingWords: totalProcessing || 0,
+      totalFailedWords: totalFailed || 0,
       activeBatches: uniqueBatches.length,
       oldestPendingWord: oldestWord || null,
       isQueueActive: (totalPending || 0) > 0,
+      processorStats: processorStats,
       lastUpdate: new Date().toISOString()
     });
 
@@ -844,4 +841,5 @@ router.get('/queue-stats', async (req, res) => {
     });
   }
 });
+
 module.exports = router;
