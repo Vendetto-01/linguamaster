@@ -93,26 +93,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// System info endpoint - Sadeleştirilmiş
-app.get('/api/system/info', (req, res) => {
-  res.json({
-    appName: 'Word Wizard',
-    version: '2.1',
-    aiModel: 'gemini-2.0-flash-001',
-    lastUpdated: new Date().toISOString(),
-    features: [
-      'File-based bulk word upload',
-      'Queue-based background processing',
-      'Gemini 2.0 Flash AI integration',
-      'Real-time queue monitoring',
-      'Turkish language analysis',
-      '6-step word analysis system'
-    ],
-    database: 'Supabase PostgreSQL',
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
-
 // Word processor kontrolü için endpoint'ler - Sadeleştirilmiş
 app.post('/api/processor/start', async (req, res) => {
   try {
@@ -185,11 +165,9 @@ app.use('*', (req, res) => {
     availableEndpoints: [
       'GET /',
       'GET /health',
-      'GET /api/system/info',
       'POST /api/words/upload-file',
       'GET /api/words/queue-status/:batchId',
       'GET /api/words/queue-stats',
-      'DELETE /api/words/clear (dev only)',
       'POST /api/processor/start',
       'POST /api/processor/stop',
       'GET /api/processor/stats'

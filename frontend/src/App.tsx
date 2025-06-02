@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import FileUpload from './components/FileUpload';
 import QueueStatus from './components/QueueStatus';
 import { FileUploadResponse } from './types';
-import { wordApi } from './services/api';
 import './App.css';
 
 type TabType = 'file' | 'queue';
@@ -14,22 +13,10 @@ interface TabConfig {
   description: string;
 }
 
-// System Info State
-interface SystemInfo {
-  appName: string;
-  version: string;
-  aiModel: string;
-  lastUpdated: string;
-  features: string[];
-  database: string;
-  environment: string;
-}
-
 function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabType>('file');
   const [lastBatchId, setLastBatchId] = useState<string | undefined>();
-  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
   // Tab configurations (sadece file ve queue)
   const tabs: TabConfig[] = [
@@ -46,20 +33,6 @@ function App() {
       description: 'Aşamalı işleme durumu ve queue takibi'
     }
   ];
-
-  // System info çek
-  useEffect(() => {
-    const fetchSystemInfo = async () => {
-      try {
-        const info = await wordApi.getSystemInfo();
-        setSystemInfo(info);
-      } catch (error) {
-        console.error('System info alınamadı:', error);
-      }
-    };
-
-    fetchSystemInfo();
-  }, []);
 
   const handleFileUploaded = (result: FileUploadResponse) => {
     setRefreshKey(prev => prev + 1);
@@ -107,22 +80,20 @@ function App() {
       }}>
         <h1 style={{ margin: '0 0 10px 0' }}>🧙‍♂️ Word Wizard</h1>
         <p style={{ margin: '0', opacity: 0.8 }}>
-          İngilizce Kelime Veritabanı Yöneticisi - {systemInfo?.aiModel || 'Gemini 2.0 Flash'} AI Destekli
+          İngilizce Kelime Veritabanı Yöneticisi - Gemini 2.0 Flash AI Destekli
         </p>
-        {systemInfo && (
-          <div style={{ marginTop: '8px' }}>
-            <span style={{
-              backgroundColor: '#007bff',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '12px',
-              fontSize: '12px',
-              fontWeight: 'bold'
-            }}>
-              v{systemInfo.version} | {systemInfo.environment}
-            </span>
-          </div>
-        )}
+        <div style={{ marginTop: '8px' }}>
+          <span style={{
+            backgroundColor: '#007bff',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '12px',
+            fontSize: '12px',
+            fontWeight: 'bold'
+          }}>
+            v2.1 | {process.env.NODE_ENV || 'development'}
+          </span>
+        </div>
       </header>
 
       {/* Tab Navigation */}
@@ -213,37 +184,27 @@ function App() {
                 <strong>Backend:</strong> {process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}
               </p>
               <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                <strong>Veritabanı:</strong> {systemInfo?.database || 'Supabase PostgreSQL'}
+                <strong>Veritabanı:</strong> Supabase PostgreSQL
               </p>
               <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                <strong>AI Engine:</strong> {systemInfo?.aiModel || 'Gemini 2.0 Flash API'}
+                <strong>AI Engine:</strong> Gemini 2.0 Flash API
               </p>
             </div>
 
             <div>
               <h4 style={{ color: '#495057', marginBottom: '10px' }}>⚡ Aşamalı Analiz Özellikleri</h4>
-              {systemInfo?.features ? (
-                systemInfo.features.slice(0, 4).map((feature, index) => (
-                  <p key={index} style={{ margin: '5px 0', fontSize: '14px' }}>
-                    ✅ {feature}
-                  </p>
-                ))
-              ) : (
-                <>
-                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                    ✅ 6 aşamalı kelime analizi
-                  </p>
-                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                    ✅ Çoklu anlam desteği
-                  </p>
-                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                    ✅ Akıllı zorluk analizi
-                  </p>
-                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                    ✅ Context-aware çeviri
-                  </p>
-                </>
-              )}
+              <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                ✅ 6 aşamalı kelime analizi
+              </p>
+              <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                ✅ Çoklu anlam desteği
+              </p>
+              <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                ✅ Akıllı zorluk analizi
+              </p>
+              <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                ✅ Context-aware çeviri
+              </p>
             </div>
           </div>
 
@@ -259,12 +220,9 @@ function App() {
               🎯 <strong>6-Step Analysis System</strong>
             </p>
             
-            {systemInfo && (
-              <p style={{ margin: '5px 0 0 0', opacity: 0.8 }}>
-                Son güncelleme: {new Date(systemInfo.lastUpdated).toLocaleDateString('tr-TR')} | 
-                Çevre: {systemInfo.environment}
-              </p>
-            )}
+            <p style={{ margin: '5px 0 0 0', opacity: 0.8 }}>
+              Çevre: {process.env.NODE_ENV || 'development'}
+            </p>
           </div>
         </div>
       </footer>

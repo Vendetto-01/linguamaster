@@ -1,4 +1,4 @@
-// frontend/src/services/api.ts - SADELEŞTİRİLMİŞ VERSİYON
+// frontend/src/services/api.ts - TEMİZLENMİŞ VERSİYON
 
 import type {
   QueueStats,
@@ -9,9 +9,9 @@ import type {
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
-// Tüm API fonksiyonlarını burada topla - SADELEŞTİRİLMİŞ
+// Tüm API fonksiyonlarını burada topla - TEMİZLENMİŞ
 export const wordApi = {
-  // Dosya yükleme - AYNI KALDI
+  // Dosya yükleme
   uploadFile: async (words: string[], fileName: string): Promise<FileUploadResponse> => {
     const response = await fetch(`${API_BASE_URL}/api/words/upload-file`, {
       method: 'POST',
@@ -29,7 +29,7 @@ export const wordApi = {
     return response.json();
   },
 
-  // Queue durumu getir - AYNI KALDI
+  // Queue durumu getir
   getQueueStatus: async (batchId: string): Promise<QueueStatus> => {
     const response = await fetch(`${API_BASE_URL}/api/words/queue-status/${batchId}`);
 
@@ -40,7 +40,7 @@ export const wordApi = {
     return response.json();
   },
 
-  // Genel queue istatistikleri - AYNI KALDI
+  // Genel queue istatistikleri
   getQueueStats: async (): Promise<QueueStats> => {
     const response = await fetch(`${API_BASE_URL}/api/words/queue-stats`);
 
@@ -51,7 +51,7 @@ export const wordApi = {
     return response.json();
   },
 
-  // Processor kontrolü - AYNI KALDI
+  // Processor kontrolü
   processor: {
     start: async (): Promise<{ message: string; stats: ProcessorStats }> => {
       const response = await fetch(`${API_BASE_URL}/api/processor/start`, {
@@ -82,40 +82,6 @@ export const wordApi = {
 
       if (!response.ok) {
         throw new Error('Processor istatistikleri alınamadı');
-      }
-
-      return response.json();
-    }
-  },
-
-  // System info endpoint - AYNI KALDI
-  getSystemInfo: async (): Promise<{
-    appName: string;
-    version: string;
-    aiModel: string;
-    lastUpdated: string;
-    features: string[];
-    database: string;
-    environment: string;
-  }> => {
-    const response = await fetch(`${API_BASE_URL}/api/system/info`);
-
-    if (!response.ok) {
-      throw new Error('System info alınamadı');
-    }
-
-    return response.json();
-  },
-
-  // Development endpoint'leri - AYNI KALDI
-  dev: {
-    clearAll: async (): Promise<{ message: string }> => {
-      const response = await fetch(`${API_BASE_URL}/api/words/clear`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Temizleme işlemi başarısız');
       }
 
       return response.json();

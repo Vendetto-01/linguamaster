@@ -1,4 +1,4 @@
-// frontend/src/types/index.ts - SADELEŞTİRİLMİŞ VERSİYON
+// frontend/src/types/index.ts - TEMİZLENMİŞ VERSİYON
 
 // Base API response wrapper
 export interface ApiResponse<T> {
@@ -7,7 +7,7 @@ export interface ApiResponse<T> {
   data: T;
 }
 
-// Pending word (queue) types - AYNI KALDI
+// Pending word (queue) types
 export interface PendingWord {
   id: number;
   word: string;
@@ -19,7 +19,7 @@ export interface PendingWord {
   updated_at: string;
 }
 
-// Processing log - AYNI KALDI
+// Processing log
 export interface WordProcessingLog {
   id: number;
   word: string;
@@ -31,7 +31,7 @@ export interface WordProcessingLog {
   processed_at: string;
 }
 
-// File upload response - AYNI KALDI
+// File upload response
 export interface FileUploadResponse {
   message: string;
   results: {
@@ -46,7 +46,7 @@ export interface FileUploadResponse {
   nextStep: string;
 }
 
-// Queue status types - AYNI KALDI
+// Queue status types
 export interface QueueStatus {
   batchId: string;
   pending: number;
@@ -57,7 +57,7 @@ export interface QueueStatus {
   lastUpdate: string;
 }
 
-// Processor Stats - AYNI KALDI
+// Processor Stats
 export interface ProcessorStats {
   isProcessing: boolean;
   processedCount: number;
@@ -81,7 +81,7 @@ export interface QueueStats {
   lastUpdate: string;
 }
 
-// Component props types - SADELEŞTİRİLDİ
+// Component props types
 export interface FileUploadProps {
   onFileUploaded: (result: FileUploadResponse) => void;
 }
@@ -92,7 +92,7 @@ export interface QueueStatusProps {
   refreshInterval?: number;
 }
 
-// Processing result types - AYNI KALDI
+// Processing result types
 export interface ProcessingResult {
   status: 'success' | 'failed' | 'queue_empty';
   word?: string;
@@ -104,7 +104,7 @@ export interface ProcessingResult {
   retryCount?: number;
 }
 
-// Upload progress tracking - AYNI KALDI
+// Upload progress tracking
 export interface UploadProgress {
   current: number;
   total: number;
@@ -114,14 +114,14 @@ export interface UploadProgress {
   message: string;
 }
 
-// Form validation types - AYNI KALDI
+// Form validation types
 export interface ValidationResult {
   isValid: boolean;
   error: string;
   words: string[];
 }
 
-// UI State types - AYNI KALDI
+// UI State types
 export interface LoadingState {
   isLoading: boolean;
   message?: string;
@@ -136,7 +136,7 @@ export interface ComponentState extends LoadingState, ErrorState {
   data?: any;
 }
 
-// Theme/UI types - SADELEŞTİRİLDİ
+// Theme/UI types
 export interface TabConfig {
   id: 'file' | 'queue'; // Sadece bu iki tab kaldı
   label: string;
@@ -144,17 +144,17 @@ export interface TabConfig {
   component: React.ComponentType<any>;
 }
 
-// Event handler types - SADELEŞTİRİLDİ
+// Event handler types
 export type ProgressEventHandler = (progress: UploadProgress) => void;
 export type ErrorEventHandler = (error: string) => void;
 export type SuccessEventHandler = (result: any) => void;
 
-// Utility types - SADELEŞTİRİLDİ
+// Utility types
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
 export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type AnalysisMethod = 'step-by-step' | 'legacy';
 
-// Configuration types - SADELEŞTİRİLDİ
+// Configuration types
 export interface AppConfig {
   apiBaseUrl: string;
   maxWordsPerBatch: number;
@@ -171,7 +171,7 @@ export interface AppConfig {
   };
 }
 
-// Environment specific types - AYNI KALDI
+// Environment specific types
 export interface Environment {
   NODE_ENV: 'development' | 'production' | 'test';
   REACT_APP_BACKEND_URL?: string;
