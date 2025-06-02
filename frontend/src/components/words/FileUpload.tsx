@@ -1,6 +1,6 @@
 // frontend/src/components/FileUpload.tsx - SADELEŞTİRİLMİŞ VERSİYON
 import React, { useState, useRef } from 'react';
-import { wordApi } from '../services/api';
+import { wordApi } from '../../services/api';
 import { FileUploadProps, FileUploadResponse, UploadProgress } from '../types';
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {

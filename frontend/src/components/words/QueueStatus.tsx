@@ -1,6 +1,6 @@
 // frontend/src/components/QueueStatus.tsx - OPTİMİZE EDİLMİŞ VERSİYON
 import React, { useState, useEffect, useCallback } from 'react';
-import { wordApi } from '../services/api';
+import { wordApi } from '../../services/api';
 import { QueueStats, ProcessorStats, QueueStatusProps } from '../types';
 
 const QueueStatus: React.FC<QueueStatusProps> = ({ 
