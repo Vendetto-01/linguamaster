@@ -263,7 +263,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
 
   const renderQuestionCard = (question: Question) => {
     const isSelected = selectedIds.has(question.id);
-    const word = question.words;
+    const word = question.word;
     
     return (
       <div
