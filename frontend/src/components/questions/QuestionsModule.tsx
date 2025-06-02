@@ -16,6 +16,8 @@ interface QuestionsTabConfig {
 interface QuestionsModuleProps {
   activeTab: QuestionsTabType;
   onTabChange: (tab: QuestionsTabType) => void;
+  refreshKey?: number; // ✅ Yeni prop eklendi
+  onRefresh?: () => void; // ✅ Yeni prop eklendi
 }
 
 interface SelectedWord {
@@ -29,9 +31,14 @@ interface SelectedWord {
   final_difficulty: string;
 }
 
-const QuestionsModule: React.FC<QuestionsModuleProps> = ({ activeTab, onTabChange }) => {
+const QuestionsModule: React.FC<QuestionsModuleProps> = ({ 
+  activeTab, 
+  onTabChange,
+  refreshKey = 0, // ✅ Default value
+  onRefresh // ✅ Yeni prop
+}) => {
   const [selectedWords, setSelectedWords] = useState<SelectedWord[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [localRefreshKey, setLocalRefreshKey] = useState(0);
 
   // Soru modülü sekmeleri
   const tabs: QuestionsTabConfig[] = [
@@ -55,6 +62,9 @@ const QuestionsModule: React.FC<QuestionsModuleProps> = ({ activeTab, onTabChang
     }
   ];
 
+  // Effective refresh key - hem parent hem local refresh'i birleştir
+  const effectiveRefreshKey = refreshKey + localRefreshKey;
+
   const handleWordsSelected = (words: SelectedWord[]) => {
     setSelectedWords(words);
     console.log(`${words.length} kelime seçildi:`, words.map(w => w.word).join(', '));
@@ -68,7 +78,8 @@ const QuestionsModule: React.FC<QuestionsModuleProps> = ({ activeTab, onTabChang
   };
 
   const handleQuestionsGenerated = (generatedCount: number) => {
-    setRefreshKey(prev => prev + 1);
+    setLocalRefreshKey(prev => prev + 1);
+    onRefresh?.(); // ✅ Parent'a bildir
     console.log(`${generatedCount} soru oluşturuldu`);
     
     // Soru oluşturulduktan sonra yönetim sekmesine geç
@@ -101,7 +112,7 @@ const QuestionsModule: React.FC<QuestionsModuleProps> = ({ activeTab, onTabChang
       case 'management':
         return (
           <QuestionManagement 
-            refreshKey={refreshKey}
+            refreshKey={effectiveRefreshKey} // ✅ refreshKey'i geç
           />
         );
       
