@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import WordForm from './components/WordForm';
 import FileUpload from './components/FileUpload';
 import QueueStatus from './components/QueueStatus';
-import { BulkAddResponse, FileUploadResponse } from './types';
+import { FileUploadResponse } from './types';
 import { wordApi } from './services/api';
 import './App.css';
 
-type TabType = 'file' | 'manual' | 'queue';
+type TabType = 'file' | 'queue';
 
 interface TabConfig {
   id: TabType;
@@ -15,7 +14,7 @@ interface TabConfig {
   description: string;
 }
 
-// YENİ: System Info State
+// System Info State
 interface SystemInfo {
   appName: string;
   version: string;
@@ -32,19 +31,13 @@ function App() {
   const [lastBatchId, setLastBatchId] = useState<string | undefined>();
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
-  // Tab configurations
+  // Tab configurations (sadece file ve queue)
   const tabs: TabConfig[] = [
     {
       id: 'file',
       label: 'Dosya Yükleme',
       icon: '📁',
       description: 'Toplu kelime yükleme (.txt dosyası)'
-    },
-    {
-      id: 'manual',
-      label: 'Manuel Ekleme',
-      icon: '✍️',
-      description: 'Kelime listesi yazarak ekleme'
     },
     {
       id: 'queue',
@@ -68,19 +61,6 @@ function App() {
     fetchSystemInfo();
   }, []);
 
-  const handleWordsAdded = (result: BulkAddResponse) => {
-    setRefreshKey(prev => prev + 1);
-    setLastBatchId(result.batchId);
-    
-    console.log('Kelimeler queue\'ya eklendi:', result);
-    
-    if (result.summary.queued > 0) {
-      setTimeout(() => {
-        setActiveTab('queue');
-      }, 1000);
-    }
-  };
-
   const handleFileUploaded = (result: FileUploadResponse) => {
     setRefreshKey(prev => prev + 1);
     setLastBatchId(result.results.batchId);
@@ -102,8 +82,6 @@ function App() {
     switch (activeTab) {
       case 'file':
         return <FileUpload onFileUploaded={handleFileUploaded} />;
-      case 'manual':
-        return <WordForm onWordsAdded={handleWordsAdded} />;
       case 'queue':
         return (
           <QueueStatus 

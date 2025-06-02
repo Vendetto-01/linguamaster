@@ -1,4 +1,4 @@
-// frontend/src/components/FileUpload.tsx
+// frontend/src/components/FileUpload.tsx - SADELEŞTİRİLMİŞ VERSİYON
 import React, { useState, useRef } from 'react';
 import { wordApi } from '../services/api';
 import { FileUploadProps, FileUploadResponse, UploadProgress } from '../types';
@@ -199,7 +199,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
     <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
       <h2>📁 Toplu Kelime Yükleme</h2>
       <p style={{ color: '#666', marginBottom: '20px' }}>
-        Kelimeler queue'ya eklenir ve arka planda Gemini API ile işlenir
+        Kelimeler queue'ya eklenir ve arka planda <strong>Gemini 2.0 Flash</strong> ile 6 aşamalı analiz edilir
       </p>
       
       {/* Progress Bar */}
@@ -341,26 +341,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
               🤖 <strong>Sonraki Adım:</strong>
             </div>
             <p style={{ margin: '0 0 8px 0' }}>
-              Kelimeler arka planda <strong>Gemini AI</strong> ile işlenmeye başlayacak. 
-              Her kelime için Türkçe karşılıklar, kelime türleri ve örnek cümleler çekilecek.
+              Kelimeler arka planda <strong>Gemini 2.0 Flash</strong> ile 6 aşamalı analiz edilmeye başlayacak. 
+              Her kelime için Türkçe karşılıklar, kelime türleri ve akademik örnek cümleler çekilecek.
             </p>
             <p style={{ margin: 0 }}>
               📊 Progress'i takip etmek için <strong>"Queue Durumu"</strong> sekmesini kontrol edebilirsiniz.
             </p>
-          </div>
-
-          {/* Processing Status */}
-          <div style={{
-            marginTop: '15px',
-            padding: '10px',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '3px',
-            fontSize: '12px',
-            color: '#666'
-          }}>
-            <div><strong>Status:</strong> {result.status}</div>
-            <div><strong>Message:</strong> {result.nextStep}</div>
-            <div><strong>Timestamp:</strong> {new Date().toLocaleString()}</div>
           </div>
         </div>
       )}
@@ -373,13 +359,36 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         fontSize: '14px',
         color: '#495057'
       }}>
-        <h4 style={{ margin: '0 0 10px 0' }}>ℹ️ Nasıl Çalışır?</h4>
-        <ol style={{ margin: 0, paddingLeft: '20px' }}>
-          <li>Dosyanızdaki kelimeler queue'ya eklenir</li>
-          <li>Background worker her kelime için Gemini AI'dan bilgi çeker</li>
-          <li>Türkçe karşılıklar, zorluk seviyeleri ve örnek cümleler veritabanına kaydedilir</li>
-          <li>İşlem tamamlandığında kelimeler quiz için hazır hale gelir</li>
-        </ol>
+        <h4 style={{ margin: '0 0 10px 0' }}>ℹ️ 6 Aşamalı Analiz Sistemi</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+          <div>
+            <strong>📝 İlk 3 Aşama:</strong>
+            <ol style={{ margin: '5px 0', paddingLeft: '15px', fontSize: '13px' }}>
+              <li>İlk zorluk tahmini</li>
+              <li>Anlam tespiti</li>
+              <li>Akademik örnek cümleler</li>
+            </ol>
+          </div>
+          <div>
+            <strong>🧠 Son 3 Aşama:</strong>
+            <ol style={{ margin: '5px 0', paddingLeft: '15px', fontSize: '13px' }} start={4}>
+              <li>Zorluk doğrulama</li>
+              <li>Türkçe çeviri</li>
+              <li>Kelime eşleştirme</li>
+            </ol>
+          </div>
+        </div>
+        
+        <div style={{ 
+          marginTop: '10px',
+          padding: '8px',
+          backgroundColor: '#cce5ff',
+          borderRadius: '3px',
+          fontSize: '12px'
+        }}>
+          <strong>⚡ Hız:</strong> ~30 kelime/dakika | 
+          <strong>🎯 Kalite:</strong> Her kelime için çoklu anlam + akademik örnekler
+        </div>
       </div>
     </div>
   );

@@ -52,7 +52,7 @@ const wordProcessor = new WordProcessor(supabase);
 // Supabase middleware
 app.use((req, res, next) => {
   req.supabase = supabase;
-  req.wordProcessor = wordProcessor; // Worker'a erişim için
+  req.wordProcessor = wordProcessor;
   next();
 });
 
@@ -61,11 +61,17 @@ app.get('/', (req, res) => {
   const stats = wordProcessor.getStats();
   res.json({
     status: 'OK',
-    message: 'Word Wizard Backend API',
-    version: '2.0',
+    message: 'Word Wizard Backend API - Simplified Version',
+    version: '2.1',
     aiModel: 'gemini-2.0-flash-001',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
+    features: [
+      'File Upload Processing',
+      'Queue Management',
+      'Background Word Processing',
+      '6-Step AI Analysis'
+    ],
     wordProcessor: {
       isProcessing: stats.isProcessing,
       processedCount: stats.processedCount,
@@ -87,27 +93,27 @@ app.get('/health', (req, res) => {
   });
 });
 
-// System info endpoint
+// System info endpoint - Sadeleştirilmiş
 app.get('/api/system/info', (req, res) => {
   res.json({
     appName: 'Word Wizard',
-    version: '2.0',
+    version: '2.1',
     aiModel: 'gemini-2.0-flash-001',
     lastUpdated: new Date().toISOString(),
     features: [
+      'File-based bulk word upload',
       'Queue-based background processing',
       'Gemini 2.0 Flash AI integration',
-      'Real-time progress tracking',
+      'Real-time queue monitoring',
       'Turkish language analysis',
-      'Difficulty level detection',
-      'Multi-meaning support'
+      '6-step word analysis system'
     ],
     database: 'Supabase PostgreSQL',
     environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// Word processor kontrolü için endpoint'ler
+// Word processor kontrolü için endpoint'ler - Sadeleştirilmiş
 app.post('/api/processor/start', async (req, res) => {
   try {
     if (wordProcessor.getStats().isProcessing) {
@@ -167,11 +173,11 @@ app.get('/api/processor/stats', (req, res) => {
   }
 });
 
-// Routes
+// Routes - Sadece words route'u
 const wordRoutes = require('./routes/words');
 app.use('/api/words', wordRoutes);
 
-// 404 handler
+// 404 handler - Güncellenmiş endpoint listesi
 app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Endpoint bulunamadı',
@@ -180,11 +186,10 @@ app.use('*', (req, res) => {
       'GET /',
       'GET /health',
       'GET /api/system/info',
-      'GET /api/words',
-      'POST /api/words/bulk',
-      'POST /api/words/bulk-stream',
       'POST /api/words/upload-file',
+      'GET /api/words/queue-status/:batchId',
       'GET /api/words/queue-stats',
+      'DELETE /api/words/clear (dev only)',
       'POST /api/processor/start',
       'POST /api/processor/stop',
       'GET /api/processor/stats'
@@ -200,7 +205,7 @@ app.use((error, req, res, next) => {
   if (error.code === 'PGRST116') {
     return res.status(404).json({
       error: 'Veritabanı tablosu bulunamadı',
-      message: 'Lütfen Supabase dashboard\'dan "words" tablosunu oluşturun'
+      message: 'Lütfen Supabase dashboard\'dan gerekli tabloları oluşturun'
     });
   }
   
@@ -226,13 +231,14 @@ app.use((error, req, res, next) => {
 
 // Server'ı başlat
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server ${PORT} portunda çalışıyor`);
+  console.log(`🚀 Word Wizard Server ${PORT} portunda çalışıyor`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📊 Supabase URL: ${supabaseUrl}`);
   console.log(`🤖 AI Model: Gemini 2.0 Flash`);
+  console.log(`📁 Core Features: File Upload + Queue Processing`);
   console.log(`⏰ Başlatma zamanı: ${new Date().toISOString()}`);
   
-  // 5 saniye sonra word processor'ı başlat
+  // 5 saniye sonra word processor'ı kontrol et
   setTimeout(() => {
     console.log('🔍 Pending words kontrol ediliyor...');
     supabase

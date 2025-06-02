@@ -1,4 +1,4 @@
-// frontend/src/components/QueueStatus.tsx - YENİ ŞEMA DESTEKLİ
+// frontend/src/components/QueueStatus.tsx - OPTİMİZE EDİLMİŞ VERSİYON
 import React, { useState, useEffect, useCallback } from 'react';
 import { wordApi } from '../services/api';
 import { QueueStats, ProcessorStats, QueueStatusProps } from '../types';
@@ -143,7 +143,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
         alignItems: 'center',
         marginBottom: '20px'
       }}>
-        <h2>📊 Aşamalı Kelime İşleme Durumu</h2>
+        <h2>📊 6 Aşamalı Kelime İşleme Durumu</h2>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button
             onClick={handleRefresh}
@@ -178,7 +178,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
         </div>
       )}
 
-      {/* YENİ: Gelişmiş Processor Status */}
+      {/* Gelişmiş Processor Status */}
       {queueStats && (
         <div style={{
           backgroundColor: '#f8f9fa',
@@ -189,7 +189,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
         }}>
           <h3 style={{ marginTop: 0 }}>🤖 Gemini 2.0 Flash Aşamalı Processor</h3>
           
-          {/* YENİ: Analysis Method Badge */}
+          {/* Analysis Method Badge */}
           <div style={{ marginBottom: '15px' }}>
             <span style={{
               backgroundColor: '#007bff',
@@ -239,7 +239,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               </div>
             </div>
 
-            {/* YENİ: Processing Hızı */}
+            {/* Processing Hızı */}
             <div>
               <div style={{ fontWeight: 'bold' }}>⚡ İşlem Hızı</div>
               <div style={{ fontSize: '16px', color: '#6f42c1' }}>
@@ -286,7 +286,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
             </button>
           </div>
           
-          {/* YENİ: Aşamalı Analiz Açıklaması */}
+          {/* Aşamalı Analiz Açıklaması */}
           {queueStats.processorStats.isProcessing && (
             <div style={{
               marginTop: '15px',
@@ -295,16 +295,16 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               borderRadius: '5px',
               fontSize: '14px'
             }}>
-              <strong>🔄 Aşamalı Analiz Süreci:</strong>
+              <strong>🔄 6 Aşamalı Analiz Süreci:</strong>
               <br />
-              1️⃣ İlk zorluk tahmini → 2️⃣ Anlam tespiti → 3️⃣ Örnek cümleler → 
+              1️⃣ İlk zorluk tahmini → 2️⃣ Anlam tespiti → 3️⃣ Akademik örnekler → 
               4️⃣ Zorluk doğrulama → 5️⃣ Türkçe çeviri → 6️⃣ Kelime eşleştirme
             </div>
           )}
         </div>
       )}
 
-      {/* Queue Overview - GÜNCELLEME */}
+      {/* Queue Overview */}
       {queueStats && (
         <div style={{
           backgroundColor: '#ffffff',
@@ -328,7 +328,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               </div>
               <div style={{ fontSize: '14px', color: '#856404' }}>Bekleyen Kelime</div>
               <div style={{ fontSize: '12px', color: '#856404', marginTop: '5px' }}>
-                (Aşamalı analiz için)
+                (6 aşamalı analiz için)
               </div>
             </div>
 
@@ -339,7 +339,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               </div>
               <div style={{ fontSize: '14px', color: '#004085' }}>İşleniyor</div>
               <div style={{ fontSize: '12px', color: '#004085', marginTop: '5px' }}>
-                (6 aşamalı analiz)
+                (AI analiz aşamasında)
               </div>
             </div>
 
@@ -389,7 +389,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
         </div>
       )}
 
-      {/* Specific Batch Status - AYNI */}
+      {/* Specific Batch Status */}
       {batchStatus && (
         <div style={{
           backgroundColor: '#e8f4f8',
@@ -450,14 +450,14 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
 
           <StatusIndicator 
             isActive={batchStatus.status === 'processing'}
-            label={batchStatus.status === 'processing' ? 'Aşamalı İşleniyor' : 'Tamamlandı'}
+            label={batchStatus.status === 'processing' ? '6 Aşamalı Analiz Devam Ediyor' : 'Batch Tamamlandı'}
             activeColor="#007bff"
             inactiveColor="#28a745"
           />
         </div>
       )}
 
-      {/* Auto Refresh Info - GÜNCELLEME */}
+      {/* Auto Refresh Info */}
       {autoRefresh && (
         <div style={{
           fontSize: '12px',
@@ -468,7 +468,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
           borderRadius: '5px'
         }}>
           🔄 Otomatik yenileme aktif ({refreshInterval / 1000} saniye aralıklarla) | 
-          ⚡ Gemini 2.0 Flash Aşamalı Analiz Sistemi
+          ⚡ Gemini 2.0 Flash 6 Aşamalı Analiz Sistemi
         </div>
       )}
     </div>
