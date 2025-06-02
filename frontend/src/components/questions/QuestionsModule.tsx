@@ -20,7 +20,7 @@ interface QuestionsModuleProps {
   onRefresh?: () => void; // ✅ Yeni prop eklendi
 }
 
-interface SelectedWord {
+interface Word {
   id: number;
   word: string;
   meaning_id: number;
@@ -29,7 +29,9 @@ interface SelectedWord {
   english_example: string;
   turkish_meaning: string;
   final_difficulty: string;
+  created_at: string;
 }
+
 
 const QuestionsModule: React.FC<QuestionsModuleProps> = ({ 
   activeTab, 
@@ -37,7 +39,7 @@ const QuestionsModule: React.FC<QuestionsModuleProps> = ({
   refreshKey = 0, // ✅ Default value
   onRefresh // ✅ Yeni prop
 }) => {
-  const [selectedWords, setSelectedWords] = useState<SelectedWord[]>([]);
+  const [selectedWords, setSelectedWords] = useState<Word[]>([]);
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
 
   // Soru modülü sekmeleri
@@ -65,8 +67,10 @@ const QuestionsModule: React.FC<QuestionsModuleProps> = ({
   // Effective refresh key - hem parent hem local refresh'i birleştir
   const effectiveRefreshKey = refreshKey + localRefreshKey;
 
-  const handleWordsSelected = (words: SelectedWord[]) => {
-    setSelectedWords(words);
+  const handleWordsSelected = (words: Word[]) => {
+  setSelectedWords(words);
+  // ... rest remains same
+};
     console.log(`${words.length} kelime seçildi:`, words.map(w => w.word).join(', '));
     
     // Kelime seçildikten sonra otomatik olarak soru oluşturma sekmesine geç
