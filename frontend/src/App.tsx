@@ -1,25 +1,62 @@
 import React, { useState } from 'react';
-import FileUpload from './components/FileUpload';
-import QueueStatus from './components/QueueStatus';
+// Kelime modülü importları
+import FileUpload from './components/words/FileUpload';
+import QueueStatus from './components/words/QueueStatus';
+import WordsModule from './components/words/WordsModule';
+
+// Soru modülü importları  
+import QuestionsModule from './components/questions/QuestionsModule';
+
+// Type importları
 import { FileUploadResponse } from './types';
 import './App.css';
 
-type TabType = 'file' | 'queue';
+type ModuleType = 'words' | 'questions';
+type WordsTabType = 'file' | 'queue' | 'database';
+type QuestionsTabType = 'selection' | 'generation' | 'management';
 
-interface TabConfig {
-  id: TabType;
+interface ModuleConfig {
+  id: ModuleType;
+  title: string;
+  icon: string;
+  description: string;
+  color: string;
+}
+
+interface WordsTabConfig {
+  id: WordsTabType;
   label: string;
   icon: string;
   description: string;
 }
 
 function App() {
+  const [activeModule, setActiveModule] = useState<ModuleType>('words');
+  const [activeWordsTab, setActiveWordsTab] = useState<WordsTabType>('file');
+  const [activeQuestionsTab, setActiveQuestionsTab] = useState<QuestionsTabType>('selection');
   const [refreshKey, setRefreshKey] = useState(0);
-  const [activeTab, setActiveTab] = useState<TabType>('file');
   const [lastBatchId, setLastBatchId] = useState<string | undefined>();
 
-  // Tab configurations (sadece file ve queue)
-  const tabs: TabConfig[] = [
+  // Ana modül konfigürasyonları
+  const modules: ModuleConfig[] = [
+    {
+      id: 'words',
+      title: 'Kelime Yönetimi',
+      icon: '📚',
+      description: 'Toplu kelime yükleme, AI analiz ve veritabanı yönetimi',
+      color: '#007bff'
+    },
+    {
+      id: 'questions',
+      title: 'Soru Yönetimi', 
+      icon: '❓',
+      description: 'Kelime seçimi, soru oluşturma ve yönetimi',
+      color: '#28a745'
+    }
+  ];
+
+  // Kelime modülü sekmeleri
+  const wordsTabs: WordsTabConfig[] = [
     {
       id: 'file',
       label: 'Dosya Yükleme',
@@ -31,6 +68,12 @@ function App() {
       label: 'Queue Durumu',
       icon: '📊',
       description: 'Aşamalı işleme durumu ve queue takibi'
+    },
+    {
+      id: 'database',
+      label: 'Veritabanı',
+      icon: '🗄️',
+      description: 'Kelime veritabanı görüntüleme ve istatistikler'
     }
   ];
 
@@ -42,17 +85,32 @@ function App() {
     
     if (result.results.queued > 0) {
       setTimeout(() => {
-        setActiveTab('queue');
+        setActiveWordsTab('queue');
       }, 1000);
     }
   };
 
-  const handleTabClick = (tabId: TabType) => {
-    setActiveTab(tabId);
+  const handleModuleClick = (moduleId: ModuleType) => {
+    setActiveModule(moduleId);
+    
+    // Modül değiştiğinde ilk sekmeye git
+    if (moduleId === 'words') {
+      setActiveWordsTab('file');
+    } else if (moduleId === 'questions') {
+      setActiveQuestionsTab('selection');
+    }
   };
 
-  const renderTabContent = () => {
-    switch (activeTab) {
+  const handleWordsTabClick = (tabId: WordsTabType) => {
+    setActiveWordsTab(tabId);
+  };
+
+  const handleQuestionsTabClick = (tabId: QuestionsTabType) => {
+    setActiveQuestionsTab(tabId);
+  };
+
+  const renderWordsContent = () => {
+    switch (activeWordsTab) {
       case 'file':
         return <FileUpload onFileUploaded={handleFileUploaded} />;
       case 'queue':
@@ -63,115 +121,234 @@ function App() {
             refreshInterval={5000}
           />
         );
+      case 'database':
+        return <WordsModule />;
       default:
         return <FileUpload onFileUploaded={handleFileUploaded} />;
     }
   };
 
+  const renderQuestionsContent = () => {
+    return (
+      <QuestionsModule 
+        activeTab={activeQuestionsTab}
+        onTabChange={handleQuestionsTabClick}
+      />
+    );
+  };
+
+  const renderContent = () => {
+    switch (activeModule) {
+      case 'words':
+        return (
+          <div>
+            {/* Kelime Modülü Alt Sekmeleri */}
+            <div style={{ 
+              backgroundColor: '#f8f9fa',
+              borderBottom: '1px solid #dee2e6',
+              padding: '0'
+            }}>
+              <div style={{ 
+                maxWidth: '1200px', 
+                margin: '0 auto',
+                display: 'flex',
+                overflow: 'auto'
+              }}>
+                {wordsTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleWordsTabClick(tab.id)}
+                    style={{
+                      flex: '1',
+                      minWidth: '200px',
+                      padding: '15px 10px',
+                      border: 'none',
+                      backgroundColor: activeWordsTab === tab.id ? '#ffffff' : 'transparent',
+                      color: activeWordsTab === tab.id ? '#495057' : '#6c757d',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: activeWordsTab === tab.id ? 'bold' : 'normal',
+                      borderBottom: activeWordsTab === tab.id ? '2px solid #007bff' : '2px solid transparent',
+                      transition: 'all 0.3s ease',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (activeWordsTab !== tab.id) {
+                        e.currentTarget.style.backgroundColor = '#e9ecef';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (activeWordsTab !== tab.id) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <div style={{ fontSize: '20px', marginBottom: '3px' }}>
+                      {tab.icon}
+                    </div>
+                    <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>
+                      {tab.label}
+                    </div>
+                    <div style={{ 
+                      fontSize: '11px', 
+                      opacity: 0.7,
+                      lineHeight: '1.2'
+                    }}>
+                      {tab.description}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Kelime Modülü İçeriği */}
+            <main style={{ 
+              minHeight: 'calc(100vh - 300px)',
+              backgroundColor: '#ffffff'
+            }}>
+              {renderWordsContent()}
+            </main>
+          </div>
+        );
+      
+      case 'questions':
+        return (
+          <main style={{ 
+            minHeight: 'calc(100vh - 200px)',
+            backgroundColor: '#ffffff'
+          }}>
+            {renderQuestionsContent()}
+          </main>
+        );
+      
+      default:
+        return renderWordsContent();
+    }
+  };
+
   return (
     <div className="App">
-      {/* Header */}
+      {/* Ana Header */}
       <header style={{ 
-        backgroundColor: '#282c34', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         padding: '20px', 
         color: 'white', 
         textAlign: 'center',
-        marginBottom: '0'
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
       }}>
-        <h1 style={{ margin: '0 0 10px 0' }}>🧙‍♂️ Word Wizard</h1>
-        <p style={{ margin: '0', opacity: 0.8 }}>
-          İngilizce Kelime Veritabanı Yöneticisi - Gemini 2.0 Flash AI Destekli
+        <h1 style={{ margin: '0 0 8px 0', fontSize: '28px' }}>
+          🧙‍♂️ Word Wizard Admin Panel
+        </h1>
+        <p style={{ margin: '0 0 10px 0', opacity: 0.9, fontSize: '16px' }}>
+          İngilizce Kelime ve Soru Yönetim Sistemi
         </p>
-        <div style={{ marginTop: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap' }}>
           <span style={{
-            backgroundColor: '#007bff',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: '12px',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            padding: '4px 12px',
+            borderRadius: '15px',
             fontSize: '12px',
             fontWeight: 'bold'
           }}>
-            v2.1 | {process.env.NODE_ENV || 'development'}
+            Gemini 2.0 Flash AI
+          </span>
+          <span style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            padding: '4px 12px',
+            borderRadius: '15px',
+            fontSize: '12px',
+            fontWeight: 'bold'
+          }}>
+            Supabase DB
+          </span>
+          <span style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            padding: '4px 12px',
+            borderRadius: '15px',
+            fontSize: '12px',
+            fontWeight: 'bold'
+          }}>
+            v3.0 Admin
           </span>
         </div>
       </header>
 
-      {/* Tab Navigation */}
+      {/* Ana Modül Navigasyonu */}
       <div style={{ 
-        backgroundColor: '#f8f9fa',
-        borderBottom: '1px solid #dee2e6',
-        padding: '0'
+        backgroundColor: '#ffffff',
+        borderBottom: '2px solid #e9ecef',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <div style={{ 
-          maxWidth: '1000px', 
+          maxWidth: '1200px', 
           margin: '0 auto',
-          display: 'flex',
-          overflow: 'auto'
+          display: 'flex'
         }}>
-          {tabs.map((tab) => (
+          {modules.map((module) => (
             <button
-              key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
+              key={module.id}
+              onClick={() => handleModuleClick(module.id)}
               style={{
                 flex: '1',
-                minWidth: '200px',
-                padding: '20px 15px',
+                padding: '25px 20px',
                 border: 'none',
-                backgroundColor: activeTab === tab.id ? '#ffffff' : 'transparent',
-                color: activeTab === tab.id ? '#495057' : '#6c757d',
+                backgroundColor: activeModule === module.id ? '#ffffff' : '#f8f9fa',
+                color: activeModule === module.id ? module.color : '#6c757d',
                 cursor: 'pointer',
                 fontSize: '16px',
-                fontWeight: activeTab === tab.id ? 'bold' : 'normal',
-                borderBottom: activeTab === tab.id ? '3px solid #007bff' : '3px solid transparent',
+                fontWeight: 'bold',
+                borderBottom: activeModule === module.id ? `4px solid ${module.color}` : '4px solid transparent',
                 transition: 'all 0.3s ease',
-                textAlign: 'center'
+                textAlign: 'center',
+                transform: activeModule === module.id ? 'translateY(-2px)' : 'none',
+                boxShadow: activeModule === module.id ? '0 4px 8px rgba(0,0,0,0.1)' : 'none'
               }}
               onMouseEnter={(e) => {
-                if (activeTab !== tab.id) {
+                if (activeModule !== module.id) {
                   e.currentTarget.style.backgroundColor = '#e9ecef';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
                 }
               }}
               onMouseLeave={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                if (activeModule !== module.id) {
+                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                  e.currentTarget.style.transform = 'none';
                 }
               }}
             >
-              <div style={{ fontSize: '24px', marginBottom: '5px' }}>
-                {tab.icon}
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>
+                {module.icon}
               </div>
-              <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>
-                {tab.label}
+              <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>
+                {module.title}
               </div>
               <div style={{ 
                 fontSize: '12px', 
-                opacity: 0.7,
-                lineHeight: '1.3'
+                opacity: 0.8,
+                lineHeight: '1.3',
+                maxWidth: '250px',
+                margin: '0 auto'
               }}>
-                {tab.description}
+                {module.description}
               </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Tab Content */}
-      <main style={{ 
-        minHeight: 'calc(100vh - 200px)',
-        backgroundColor: '#ffffff'
-      }}>
-        {renderTabContent()}
-      </main>
+      {/* Modül İçeriği */}
+      {renderContent()}
 
       {/* Footer */}
       <footer style={{ 
         backgroundColor: '#f8f9fa',
         textAlign: 'center', 
-        padding: '30px 20px', 
+        padding: '25px 20px', 
         color: '#6c757d',
-        borderTop: '1px solid #dee2e6'
+        borderTop: '1px solid #dee2e6',
+        marginTop: 'auto'
       }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
@@ -179,31 +356,32 @@ function App() {
             marginBottom: '20px'
           }}>
             <div>
-              <h4 style={{ color: '#495057', marginBottom: '10px' }}>🔧 Teknik Bilgiler</h4>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                <strong>Backend:</strong> {process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}
+              <h4 style={{ color: '#495057', marginBottom: '10px' }}>
+                📚 Kelime Modülü Özellikleri
+              </h4>
+              <p style={{ margin: '5px 0', fontSize: '13px' }}>
+                ✅ Toplu dosya yükleme sistemi
               </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                <strong>Veritabanı:</strong> Supabase PostgreSQL
+              <p style={{ margin: '5px 0', fontSize: '13px' }}>
+                ✅ 6 aşamalı AI kelime analizi
               </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                <strong>AI Engine:</strong> Gemini 2.0 Flash API
+              <p style={{ margin: '5px 0', fontSize: '13px' }}>
+                ✅ Queue yönetimi ve background processing
               </p>
             </div>
 
             <div>
-              <h4 style={{ color: '#495057', marginBottom: '10px' }}>⚡ Aşamalı Analiz Özellikleri</h4>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                ✅ 6 aşamalı kelime analizi
+              <h4 style={{ color: '#495057', marginBottom: '10px' }}>
+                ❓ Soru Modülü Özellikleri
+              </h4>
+              <p style={{ margin: '5px 0', fontSize: '13px' }}>
+                ✅ Çoklu kelime seçimi ve filtreleme
               </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                ✅ Çoklu anlam desteği
+              <p style={{ margin: '5px 0', fontSize: '13px' }}>
+                ✅ AI destekli soru oluşturma
               </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                ✅ Akıllı zorluk analizi
-              </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
-                ✅ Context-aware çeviri
+              <p style={{ margin: '5px 0', fontSize: '13px' }}>
+                ✅ Soru veritabanı yönetimi
               </p>
             </div>
           </div>
@@ -214,14 +392,15 @@ function App() {
             fontSize: '12px'
           }}>
             <p style={{ margin: '0' }}>
-              🤖 Powered by <strong>Gemini 2.0 Flash</strong> | 
-              🗄️ <strong>Supabase</strong> | 
+              🤖 <strong>Gemini 2.0 Flash</strong> | 
+              🗄️ <strong>Supabase PostgreSQL</strong> | 
               ⚛️ <strong>React + TypeScript</strong> | 
-              🎯 <strong>6-Step Analysis System</strong>
+              🔧 <strong>Modüler Admin Panel</strong>
             </p>
             
             <p style={{ margin: '5px 0 0 0', opacity: 0.8 }}>
-              Çevre: {process.env.NODE_ENV || 'development'}
+              Environment: {process.env.NODE_ENV || 'development'} | 
+              Backend: {process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}
             </p>
           </div>
         </div>
