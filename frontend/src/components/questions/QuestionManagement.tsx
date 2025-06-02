@@ -105,7 +105,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
 
   // Soru sil - YENİ: questionsApi kullan
   const handleDeleteQuestion = async (questionId: number) => {
-    if (!window.confirm'Bu soruyu silmek istediğinizden emin misiniz?')) {
+    if (!window.confirm('Bu soruyu silmek istediğinizden emin misiniz?')) {
       return;
     }
 
