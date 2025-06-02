@@ -1,5 +1,7 @@
 // frontend/src/components/questions/WordSelection.tsx - KELİME SEÇİMİ KOMPONENTİ
 import React, { useState, useEffect } from 'react';
+// YENİ: Kelime API'leri için doğru import
+// Not: Bu component kelime listesi çekiyor, questionsApi değil wordApi kullanmalı
 
 interface Word {
   id: number;
@@ -49,7 +51,8 @@ const WordSelection: React.FC<WordSelectionProps> = ({ onWordsSelected, selected
   const pageSize = 20;
   const maxSelections = 50; // Maksimum seçim sayısı
 
-  // Kelimeleri getir
+  // Kelimeleri getir - MEVCUT: Doğrudan fetch kullanıyor, bu doğru
+  // Not: Bu kelime listesi çekiyor, questionsApi değil words endpoint'i kullanmalı
   const fetchWords = async () => {
     try {
       setIsLoading(true);

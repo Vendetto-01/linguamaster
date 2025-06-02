@@ -1,6 +1,7 @@
 // frontend/src/components/questions/QuestionGeneration.tsx - SORU OLUŞTURMA KOMPONENTİ
 import React, { useState } from 'react';
 import { QuestionGenerationProps } from '../../types/questions';
+import { questionsApi } from '../../services/questionsApi'; // YENİ: API import'u
 
 interface GenerationProgress {
   current: number;
@@ -84,24 +85,8 @@ const QuestionGeneration: React.FC<QuestionGenerationProps> = ({
         message: 'AI ile sorular oluşturuluyor...'
       } : null);
 
-      // Backend'e soru oluşturma isteği gönder
-      const response = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/words/questions/generate`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ wordIds })
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Soru oluşturma başarısız');
-      }
-
-      const generationResult: GenerationResult = await response.json();
+      // YENİ: questionsApi kullan
+      const generationResult = await questionsApi.generateQuestions(wordIds);
 
       setProgress(prev => prev ? {
         ...prev,
@@ -266,7 +251,7 @@ const QuestionGeneration: React.FC<QuestionGenerationProps> = ({
         
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+          gridTemplateColumns: 'repeat(auto-fit, minWidth(150px, 1fr))', 
           gap: '15px',
           marginBottom: '20px'
         }}>

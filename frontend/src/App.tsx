@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-// Kelime modülü importları
+// Kelime modülü importları - YENİ PATH'LER
 import FileUpload from './components/words/FileUpload';
 import QueueStatus from './components/words/QueueStatus';
 import WordsModule from './components/words/WordsModule';
@@ -109,6 +109,11 @@ function App() {
     setActiveQuestionsTab(tabId);
   };
 
+  // Soru modülü için refresh handler - YENİ
+  const handleQuestionsRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   const renderWordsContent = () => {
     switch (activeWordsTab) {
       case 'file':
@@ -133,6 +138,8 @@ function App() {
       <QuestionsModule 
         activeTab={activeQuestionsTab}
         onTabChange={handleQuestionsTabClick}
+        refreshKey={refreshKey} // Yeni prop eklendi
+        onRefresh={handleQuestionsRefresh} // Yeni prop eklendi
       />
     );
   };

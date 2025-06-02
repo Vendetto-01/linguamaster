@@ -1,33 +1,7 @@
 // frontend/src/components/questions/QuestionManagement.tsx - SORU YÖNETİMİ KOMPONENTİ
 import React, { useState, useEffect } from 'react';
-import { QuestionManagementProps } from '../../types/questions';
-
-interface Question {
-  id: number;
-  word_id: number;
-  question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_answer: 'A' | 'B' | 'C' | 'D';
-  explanation: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  paragraph: string;
-  times_shown: number;
-  times_correct: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  words?: {
-    word: string;
-    meaning_id: number;
-    part_of_speech: string;
-    meaning_description: string;
-    turkish_meaning: string;
-    final_difficulty: string;
-  };
-}
+import { QuestionManagementProps, Question, QuestionStats } from '../../types/questions';
+import { questionsApi } from '../../services/questionsApi'; // YENİ: API import'u
 
 interface QuestionsResponse {
   questions: Question[];
@@ -38,17 +12,6 @@ interface QuestionsResponse {
     hasNext: boolean;
     hasPrev: boolean;
   };
-}
-
-interface QuestionStats {
-  totalQuestions: number;
-  activeQuestions: number;
-  difficultyBreakdown: {
-    beginner: number;
-    intermediate: number;
-    advanced: number;
-  };
-  recentQuestions: number;
 }
 
 const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) => {
@@ -70,37 +33,20 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
 
   const pageSize = 20;
 
-  // Soruları getir
+  // Soruları getir - YENİ: questionsApi kullan
   const fetchQuestions = async () => {
     try {
       setIsLoading(true);
       
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: pageSize.toString()
-      });
+      const filters = {
+        page: currentPage,
+        limit: pageSize,
+        ...(searchQuery.trim() && { search: searchQuery.trim() }),
+        ...(difficultyFilter && { difficulty: difficultyFilter as any }),
+        ...(activeFilter !== '' && { isActive: activeFilter === 'true' })
+      };
 
-      if (searchQuery.trim()) {
-        params.append('search', searchQuery.trim());
-      }
-
-      if (difficultyFilter) {
-        params.append('difficulty', difficultyFilter);
-      }
-
-      if (activeFilter !== '') {
-        params.append('isActive', activeFilter);
-      }
-
-      const response = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/words/questions?${params}`
-      );
-      
-      if (!response.ok) {
-        throw new Error('Sorular yüklenemedi');
-      }
-
-      const data: QuestionsResponse = await response.json();
+      const data = await questionsApi.getQuestions(filters);
       
       setQuestions(data.questions || []);
       setPagination(data.pagination || null);
@@ -114,17 +60,11 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
     }
   };
 
-  // İstatistikleri getir
+  // İstatistikleri getir - YENİ: questionsApi kullan
   const fetchStats = async () => {
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/words/questions/stats`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      }
+      const data = await questionsApi.getQuestionStats();
+      setStats(data);
     } catch (err) {
       console.error('İstatistik yükleme hatası:', err);
     }
@@ -145,21 +85,12 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
     setCurrentPage(page);
   };
 
-  // Tekil soru durumu değiştir
+  // Tekil soru durumu değiştir - YENİ: questionsApi kullan
   const handleToggleQuestion = async (questionId: number) => {
     try {
       setIsUpdating(true);
       
-      const response = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/words/questions/${questionId}/toggle-active`,
-        {
-          method: 'POST',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Soru durumu değiştirilemedi');
-      }
+      await questionsApi.toggleQuestionActive(questionId);
 
       // Listeyi yenile
       await fetchQuestions();
@@ -172,7 +103,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
     }
   };
 
-  // Soru sil
+  // Soru sil - YENİ: questionsApi kullan
   const handleDeleteQuestion = async (questionId: number) => {
     if (!confirm('Bu soruyu silmek istediğinizden emin misiniz?')) {
       return;
@@ -181,16 +112,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
     try {
       setIsUpdating(true);
       
-      const response = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/words/questions/${questionId}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Soru silinemedi');
-      }
+      await questionsApi.deleteQuestion(questionId);
 
       // Listeyi yenile
       await fetchQuestions();
@@ -203,7 +125,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
     }
   };
 
-  // Toplu işlem
+  // Toplu işlem - YENİ: questionsApi kullan
   const handleBulkOperation = async (operation: 'activate' | 'deactivate' | 'delete') => {
     if (selectedIds.size === 0) {
       alert('Lütfen işlem yapılacak soruları seçin');
@@ -221,25 +143,7 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
     try {
       setIsUpdating(true);
       
-      const response = await fetch(
-        `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/words/questions/bulk`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            questionIds: Array.from(selectedIds),
-            operation
-          })
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Toplu işlem başarısız');
-      }
-
-      const result = await response.json();
+      const result = await questionsApi.bulkOperation(Array.from(selectedIds), operation);
       alert(result.message);
 
       // Seçimi temizle ve listeyi yenile
