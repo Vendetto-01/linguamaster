@@ -1,9 +1,5 @@
-// frontend/src/config/appConfig.ts
-// Bu tipler App.tsx'den veya types/index.ts'ten gelebilir.
-// Şimdilik konfigürasyonla birlikte burada tanımlıyoruz.
-export type ModuleType = 'words' | 'questions';
-export type WordsTabType = 'file' | 'queue' | 'database';
-// QuestionsTabType QuestionsModule içinde kullanılıyor, gerekirse o da buraya veya types/index.ts'e taşınabilir.
+// frontend/src/config/appConfig.ts - TEMİZLENMİŞ VERSİYON
+import type { ModuleType, WordsModuleTabId } from '../types';
 
 export interface ModuleConfig {
   id: ModuleType;
@@ -14,31 +10,8 @@ export interface ModuleConfig {
 }
 
 export interface WordsTabConfig {
-  id: WordsTabType;
-  label:string;
-  icon: string;
-  description: string;
-}
-
-export const modules: ModuleConfig[] = [
-  {
-    id: 'words',
-    title: 'Kelime Yönetimi',// frontend/src/config/appConfig.ts - GÜNCELLENMİŞ VERSİYON
-import type { ModuleType, WordsModuleTabId } from '../types'; // Tipler ../types'tan import edildi
-
-// ModuleType ve WordsTabType lokal tanımları kaldırıldı.
-
-export interface ModuleConfig { // Bu arayüz burada kalabilir veya types/index.ts'teki ModuleConfigApp kullanılabilir
-  id: ModuleType; // Import edilen ModuleType kullanılıyor
-  title: string;
-  icon: string;
-  description: string;
-  color: string;
-}
-
-export interface WordsTabConfig { // Bu arayüz burada kalabilir veya types/index.ts'teki WordsTabConfigApp kullanılabilir
-  id: WordsModuleTabId; // Import edilen WordsModuleTabId kullanılıyor
-  label:string;
+  id: WordsModuleTabId;
+  label: string;
   icon: string;
   description: string;
 }
