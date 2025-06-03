@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import wordRoutes from './routes/word.routes';
 import bulkRoutes from './routes/bulk.routes'; // Import bulk routes
+import reportRoutes from './routes/report.routes'; // Import report routes
 import { startWorkerLoop } from './workers/bulkWorker.service'; // Import bulk worker starter
 import { startReportWorkerLoop } from './workers/reportWorker.service'; // Import report worker starter
 
@@ -27,6 +28,7 @@ app.use(express.json({ limit: '10mb' }));
 // API Routes
 app.use('/api/words', wordRoutes);
 app.use('/api/bulk', bulkRoutes);
+app.use('/api/reports', reportRoutes); // Use report routes
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Vocabulary App Backend Running with Bulk Processing Capabilities');
