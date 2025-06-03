@@ -1,4 +1,4 @@
-// frontend/src/App.tsx - DÜZELTILMIŞ İMPORT'LAR
+// frontend/src/App.tsx - DÜZELTİLMİŞ İMPORTLAR
 import React, { useState } from 'react';
 import WordsModuleRenderer from './components/layout/WordsModuleRenderer';
 import QuestionsModuleRenderer from './components/layout/QuestionsModuleRenderer';

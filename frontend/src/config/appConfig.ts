@@ -26,7 +26,7 @@ export const modules: ModuleConfig[] = [
   },
   {
     id: 'questions',
-    title: 'Soru Yönetimi', 
+    title: 'Soru Yönetimi',
     icon: '❓',
     description: 'Kelime seçimi, soru oluşturma ve yönetimi',
     color: '#28a745'

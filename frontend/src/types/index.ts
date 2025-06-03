@@ -1,9 +1,6 @@
-// frontend/src/types/index.ts - GÜNCELLENMİŞ VERSİYON
+// frontend/src/types/index.ts - TAMAMLANMIŞ VERSİYON
 
-// Mevcut tipleriniz burada devam edecek...
-// ... (yukarıdaki existing types)
-
-// YENİ EKLENEN TİPLER (Kelimeler ve Kelime API Yanıtı için) - Önceki adımlardan
+// === WORD RELATED TYPES ===
 export interface Word {
   id: number;
   word: string;
@@ -61,42 +58,91 @@ export interface WordFilters {
   difficultyType?: 'initial' | 'final';
 }
 
-
-// --- YENİ EKLENEN MODÜL VE SEKME TİPLERİ ---
+// === MODULE & TAB TYPES ===
 export type ModuleType = 'words' | 'questions';
+export type WordsModuleTabId = 'file' | 'queue' | 'database';
+export type QuestionsModuleTabId = 'selection' | 'generation' | 'management';
 
-export type WordsModuleTabId = 'file' | 'queue' | 'database'; // Daha spesifik bir isim verildi (WordsTabType yerine)
+// === FILE UPLOAD TYPES ===
+export interface FileUploadResponse {
+  message: string;
+  status: string;
+  results: {
+    fileName: string;
+    batchId: string;
+    totalWords: number;
+    queued: number;
+    duplicates: number;
+    failed: number;
+  };
+  nextStep: string;
+}
 
-export type QuestionsModuleTabId = 'selection' | 'generation' | 'management'; // Daha spesifik bir isim verildi (QuestionsTabType yerine)
+export interface FileUploadProps {
+  onFileUploaded: (result: FileUploadResponse) => void;
+}
 
-// App.tsx'deki ModuleConfig ve WordsTabConfig arayüzleri de buraya taşınabilir
-// veya config dosyasında kalabilirler. Şimdilik sadece ID tiplerini taşıdık.
-// Eğer config objelerinin tipleri de global olacaksa, buraya almak mantıklı olur:
+export interface UploadProgress {
+  current: number;
+  total: number;
+  percentage: number;
+  stage: 'starting' | 'reading' | 'uploading' | 'complete' | 'error';
+  message: string;
+}
 
-export interface ModuleConfigApp { // appConfig.ts'deki ModuleConfig ile karışmaması için farklı bir isim
+// === QUEUE & PROCESSOR TYPES ===
+export interface ProcessorStats {
+  isProcessing: boolean;
+  processedCount: number;
+  errorCount: number;
+  elapsedTime: number;
+  analysisMethod?: string;
+}
+
+export interface QueueStats {
+  totalPendingWords: number;
+  totalProcessingWords: number;
+  totalFailedWords: number;
+  activeBatches: number;
+  oldestPendingWord: {
+    word: string;
+    created_at: string;
+  } | null;
+  isQueueActive: boolean;
+  processorStats: ProcessorStats;
+}
+
+export interface QueueStatus {
+  batchId: string;
+  pending: number;
+  processing: number;
+  processed: number;
+  failed: number;
+  status: string;
+  lastUpdate: string;
+}
+
+// === CONFIG TYPES ===
+export interface ModuleConfigApp {
   id: ModuleType;
   title: string;
   icon: string;
-  description:string;
+  description: string;
   color: string;
 }
 
-export interface WordsTabConfigApp { // appConfig.ts'deki WordsTabConfig ile karışmaması için farklı bir isim
+export interface WordsTabConfigApp {
   id: WordsModuleTabId;
   label: string;
   icon: string;
   description: string;
 }
 
-// QuestionsTabConfig için de benzer bir arayüz (QuestionsModule içinde tanımlıysa oradan buraya gelebilir)
 export interface QuestionsTabConfigApp {
-    id: QuestionsModuleTabId;
-    label: string;
-    icon: string;
-    // QuestionsModule'ün beklediği diğer proplar eklenebilir
+  id: QuestionsModuleTabId;
+  label: string;
+  icon: string;
+  description: string;
 }
 
-
-// --- MEVCUT TİPLERİNİZİN SONU ---
-
-export default {}; // Eğer dosyanızda default export yoksa ve eklemek isterseniz
+export default {};

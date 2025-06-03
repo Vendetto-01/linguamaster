@@ -1,4 +1,4 @@
-// frontend/src/services/api.ts - GÜNCELLENMİŞ VERSİYON
+// frontend/src/services/api.ts - DÜZELTİLMİŞ İMPORTLAR
 
 import type {
   QueueStats,
@@ -8,11 +8,9 @@ import type {
   WordsResponse,
   WordFilters
 } from '../types';
-import { handleApiError } from '../utils/apiUtils'; // Ortak handleApiError import edildi
+import { handleApiError } from '../utils/apiUtils';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
-
-// Yerel handleApiError fonksiyonu kaldırıldı.
 
 export const wordApi = {
   uploadFile: async (words: string[], fileName: string): Promise<FileUploadResponse> => {
@@ -25,7 +23,7 @@ export const wordApi = {
     });
 
     if (!response.ok) {
-      await handleApiError(response); // Ortak fonksiyon kullanılıyor
+      await handleApiError(response);
     }
     return response.json();
   },
@@ -33,7 +31,7 @@ export const wordApi = {
   getQueueStatus: async (batchId: string): Promise<QueueStatus> => {
     const response = await fetch(`${API_BASE_URL}/api/words/queue-status/${batchId}`);
     if (!response.ok) {
-      await handleApiError(response); // Ortak fonksiyon kullanılıyor
+      await handleApiError(response);
     }
     return response.json();
   },
@@ -41,7 +39,7 @@ export const wordApi = {
   getQueueStats: async (): Promise<QueueStats> => {
     const response = await fetch(`${API_BASE_URL}/api/words/queue-stats`);
     if (!response.ok) {
-      await handleApiError(response); // Ortak fonksiyon kullanılıyor
+      await handleApiError(response);
     }
     return response.json();
   },
@@ -56,9 +54,9 @@ export const wordApi = {
     if (filters.groupByWord !== undefined) params.append('groupByWord', filters.groupByWord.toString());
     if (filters.difficultyType) params.append('difficultyType', filters.difficultyType);
 
-    const response = await fetch(`${API_BASE_URL}/api/words?${params.toString()}`); // .toString() eklendi
+    const response = await fetch(`${API_BASE_URL}/api/words?${params.toString()}`);
     if (!response.ok) {
-      await handleApiError(response); // Ortak fonksiyon kullanılıyor
+      await handleApiError(response);
     }
     return response.json();
   },
@@ -69,7 +67,7 @@ export const wordApi = {
         method: 'POST',
       });
       if (!response.ok) {
-        await handleApiError(response); // Ortak fonksiyon kullanılıyor
+        await handleApiError(response);
       }
       return response.json();
     },
@@ -79,7 +77,7 @@ export const wordApi = {
         method: 'POST',
       });
       if (!response.ok) {
-        await handleApiError(response); // Ortak fonksiyon kullanılıyor
+        await handleApiError(response);
       }
       return response.json();
     },
@@ -87,7 +85,7 @@ export const wordApi = {
     getStats: async (): Promise<{ stats: ProcessorStats; timestamp: string }> => {
       const response = await fetch(`${API_BASE_URL}/api/processor/stats`);
       if (!response.ok) {
-        await handleApiError(response); // Ortak fonksiyon kullanılıyor
+        await handleApiError(response);
       }
       return response.json();
     }
