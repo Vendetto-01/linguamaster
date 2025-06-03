@@ -1,5 +1,6 @@
 // backend/services/wordProcessor.js - UPDATED FOR ACADEMIC SENTENCES, ORIGINAL DIFFICULTY SCHEMA
 const axios = require('axios');
+const { WORD_PROCESSOR_PROMPT_TEMPLATE } = require('../config/prompts'); // DÜZELTME: Import eklendi
 
 class WordProcessor {
   constructor(supabase) {
@@ -16,9 +17,9 @@ class WordProcessor {
   }
 
   // Gemini API'den kelime bilgilerini çek
-  async fetchWordFromGeminiAPI(word, WORD_PROCESSOR_PROMPT_TEMPLATE) {
+  async fetchWordFromGeminiAPI(word) { // DÜZELTME: WORD_PROCESSOR_PROMPT_TEMPLATE parametre olarak alınmıyor artık
     try {
-      const prompt = WORD_PROCESSOR_PROMPT_TEMPLATE(word);
+      const prompt = WORD_PROCESSOR_PROMPT_TEMPLATE(word); // DÜZELTME: Doğrudan import'tan kullanılıyor
 
       console.log(`🤖 Gemini 2.0 Flash - Aşamalı analiz başlatılıyor: ${word}`);
 
@@ -245,7 +246,7 @@ class WordProcessor {
         .eq('id', pendingWord.id);
 
       try {
-        const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word, WORD_PROCESSOR_PROMPT_TEMPLATE).bind(this);
+        const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word); // DÜZELTME: Sadece kelime gönderiliyor
         // parseGeminiDataForSupabase fonksiyonu artık orijinal JSON formatını bekliyor ve ona göre çalışacak.
         const parsedWords = this.parseGeminiDataForSupabase(geminiData, pendingWord.word);
 
