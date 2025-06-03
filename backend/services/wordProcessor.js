@@ -245,7 +245,7 @@ class WordProcessor {
         .eq('id', pendingWord.id);
 
       try {
-        const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word, WORD_PROCESSOR_PROMPT_TEMPLATE);
+        const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word, WORD_PROCESSOR_PROMPT_TEMPLATE).bind(this);
         // parseGeminiDataForSupabase fonksiyonu artık orijinal JSON formatını bekliyor ve ona göre çalışacak.
         const parsedWords = this.parseGeminiDataForSupabase(geminiData, pendingWord.word);
 

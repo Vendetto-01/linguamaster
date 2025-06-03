@@ -7,6 +7,7 @@ const WordProcessor = require('./services/wordProcessor');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1); // trust first proxy
 
 // Render.com için PORT konfigürasyonu
 const PORT = process.env.PORT || 5000;
