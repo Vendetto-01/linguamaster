@@ -5,7 +5,8 @@ import type { WordEntry } from '../types/word.types';
 const AdminPage: React.FC = () => {
   const [lastAddedWord, setLastAddedWord] = useState<WordEntry | null>(null);
   // In a more complex app, you might have a list of words, etc.
-  // For now, we just show the last one added via the form's own display.
+  // For now, we just show the last one added via the form's own display,
+  // plus a small confirmation here.
 
   const handleWordAdded = (newWord: WordEntry) => {
     console.log('Word added from AdminPage:', newWord);
@@ -23,17 +24,15 @@ const AdminPage: React.FC = () => {
 
       {/* 
         The WordSubmitForm already displays the details of the submitted word.
-        If you wanted to display it separately or add to a list on this page,
-        you could use the `lastAddedWord` state. For example:
-
-        {lastAddedWord && (
-          <div style={{ marginTop: '30px', borderTop: '2px solid blue', paddingTop: '20px' }}>
-            <h2>Confirmation on Admin Page:</h2>
-            <p>Successfully added: <strong>{lastAddedWord.word}</strong></p>
-            <p>Definition: {lastAddedWord.definition.split('\n')[0]}</p>
-          </div>
-        )} 
+        This section demonstrates using the state in the AdminPage as well.
       */}
+      {lastAddedWord && (
+        <div style={{ marginTop: '30px', borderTop: '2px solid blue', paddingTop: '20px' }}>
+          <h2>Confirmation on Admin Page:</h2>
+          <p>Successfully added: <strong>{lastAddedWord.word}</strong></p>
+          <p>Definition (first line): {lastAddedWord.definition.split('\n')[0].replace(/^•\s*/, '')}</p>
+        </div>
+      )}
     </div>
   );
 };
