@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../config/supabaseClient';
 import { BulkWordsSubmissionRequest, BulkJob } from '../types/bulk.types';
 
-const MAX_BULK_WORDS_PER_REQUEST = 500; // Set a reasonable limit for initial submission
+const MAX_BULK_WORDS_PER_REQUEST = 20000; // Increased limit for initial submission
 
 export const submitBulkWordsController = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -17,7 +17,7 @@ export const submitBulkWordsController = async (req: Request, res: Response, nex
     }
     
     if (words.length > MAX_BULK_WORDS_PER_REQUEST) {
-      return res.status(400).json({ message: `Too many words submitted. Maximum allowed is ${MAX_BULK_WORDS_PER_REQUEST} per request.` });
+      return res.status(400).json({ message: `Too many words submitted. Maximum allowed is ${MAX_BULK_WORDS_PER_REQUEST} per request. Please submit in smaller batches.` });
     }
 
     // 1. Create a new bulk job entry
@@ -42,6 +42,8 @@ export const submitBulkWordsController = async (req: Request, res: Response, nex
     const newJob = jobData as BulkJob;
 
     // 2. Prepare individual word entries for the bulk_job_words table
+    // For very large arrays (e.g., 10k+), this map operation can consume memory.
+    // Consider batching inserts to Supabase if this becomes an issue.
     const jobWordsToInsert = words.map(wordText => ({
       job_id: newJob.id,
       word_text: wordText.trim(),
@@ -49,6 +51,7 @@ export const submitBulkWordsController = async (req: Request, res: Response, nex
     }));
 
     // 3. Insert all words into bulk_job_words
+    // Supabase client has its own internal batching for large inserts, but monitor performance.
     const { error: wordsError } = await supabase
       .from('bulk_job_words')
       .insert(jobWordsToInsert);

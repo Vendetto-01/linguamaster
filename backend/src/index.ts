@@ -20,7 +20,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-app.use(express.json({ limit: '1mb' })); 
+// Middleware to parse JSON bodies. Increased limit for larger bulk submissions.
+app.use(express.json({ limit: '10mb' })); 
 
 // API Routes
 app.use('/api/words', wordRoutes);
@@ -34,7 +35,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error("Global error handler caught:", err.stack);
   if (err.name === 'PayloadTooLargeError') {
-    return res.status(413).json({ message: 'Request payload is too large. Please submit fewer words at a time.' });
+    return res.status(413).json({ message: 'Request payload is too large. Please submit fewer words at a time or contact support if this limit is too restrictive.' });
   }
   res.status(500).json({ message: 'Something broke!', error: err.message });
 });
