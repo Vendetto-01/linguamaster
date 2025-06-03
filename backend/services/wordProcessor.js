@@ -186,9 +186,13 @@ class WordProcessor {
   async saveQuestionsToDatabase(questions) {
     for (const question of questions) {
       try {
+        const questionData = {
+          ...question,
+          paragraph: question.paragraph || '' // Boş değer kontrolü
+        };
         const { error: insertError } = await this.supabase
           .from('questions')
-          .insert([question]);
+          .insert([questionData]);
 
         if (insertError) {
           console.error(`❌ Soru kaydetme hatası (meaning_id: ${question.meaning_id}):`, insertError);
