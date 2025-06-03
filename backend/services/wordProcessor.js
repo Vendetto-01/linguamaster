@@ -16,7 +16,7 @@ class WordProcessor {
   }
 
   // Gemini API'den kelime bilgilerini çek
-  async fetchWordFromGeminiAPI(word) {
+  async fetchWordFromGeminiAPI(word, WORD_PROCESSOR_PROMPT_TEMPLATE) {
     try {
       const prompt = WORD_PROCESSOR_PROMPT_TEMPLATE(word);
 
@@ -245,7 +245,7 @@ class WordProcessor {
         .eq('id', pendingWord.id);
 
       try {
-        const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word);
+        const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word, WORD_PROCESSOR_PROMPT_TEMPLATE);
         // parseGeminiDataForSupabase fonksiyonu artık orijinal JSON formatını bekliyor ve ona göre çalışacak.
         const parsedWords = this.parseGeminiDataForSupabase(geminiData, pendingWord.word);
 
