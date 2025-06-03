@@ -26,13 +26,11 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     hasNext: false,
     hasPrev: false
   });
-
   const [filters, setFilters] = useState<QuestionFilterParams>({});
   const [sort, setSort] = useState<QuestionSortParams>({
     sortBy: 'created_at',
     sortOrder: 'desc'
   });
-
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectAllOnPage, setSelectAllOnPage] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -64,20 +62,20 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
   }, [filters, pagination.currentPage, pageSize, sort]);
 
   // Filtreleme işlemi
-  const handleFilterChange = (newFilters: QuestionFilterParams) => {
+  const handleFilterChange = useCallback((newFilters: QuestionFilterParams) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
     setPagination(prev => ({ ...prev, currentPage: 1 }));
-  };
+  }, []);
 
   // Sıralama işlemi
-  const handleSortChange = (newSort: QuestionSortParams) => {
+  const handleSortChange = useCallback((newSort: QuestionSortParams) => {
     setSort(newSort);
-  };
+  }, []);
 
   // Sayfa değiştirme
-  const handlePageChange = (newPage: number) => {
+  const handlePageChange = useCallback((newPage: number) => {
     setPagination(prev => ({ ...prev, currentPage: newPage }));
-  };
+  }, []);
 
   // Soru seçme işlemleri
   const toggleSelectQuestion = useCallback((questionId: string) => {
@@ -95,28 +93,28 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
   // Toplu seçim işlemleri
   const toggleSelectAllOnPage = useCallback(() => {
     setSelectAllOnPage(prev => {
-      if (prev) {
-        setSelectedIds(new Set());
-        return false;
-      } else {
+      const newValue = !prev;
+      if (newValue) {
         setSelectedIds(new Set(questions.map(q => q.id)));
-        return true;
+      } else {
+        setSelectedIds(new Set());
       }
+      return newValue;
     });
   }, [questions]);
 
   // Soru güncelleme işlemi
-  const handleUpdateQuestion = async (questionId: string, updates: Partial<Question>) => {
+  const handleUpdateQuestion = useCallback(async (questionId: string, updates: Partial<Question>) => {
     try {
       await questionsApi.updateQuestion(questionId, updates);
       await fetchQuestions();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Soru güncellenirken bir hata oluştu');
     }
-  };
+  }, [fetchQuestions]);
 
   // Soru silme işlemi
-  const handleDeleteQuestion = async (questionId: string) => {
+  const handleDeleteQuestion = useCallback(async (questionId: string) => {
     try {
       await questionsApi.deleteQuestion(questionId);
       setSelectedIds(prev => {
@@ -128,10 +126,10 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Soru silinirken bir hata oluştu');
     }
-  };
+  }, [fetchQuestions]);
 
   // Toplu soru silme işlemi
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = useCallback(async () => {
     try {
       await questionsApi.bulkDeleteQuestions(Array.from(selectedIds));
       setSelectedIds(new Set());
@@ -139,49 +137,7 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sorular silinirken bir hata oluştu');
     }
-  };
-
-  // Soru üretme işlemi
-  const generateQuestions = async (wordIds: number[]) => {
-    setIsGenerating(true);
-    setProgress({
-      current: 0,
-      total: wordIds.length,
-      percentage: 0,
-      stage: 'starting',
-      message: 'Soru üretimi başlatılıyor...',
-      successful: 0,
-      failed: 0,
-      timeElapsed: 0
-    });
-
-    try {
-      const generationResult = await questionsApi.generateQuestions({
-        wordIds,
-        maxConcurrent: 5,
-        validateQuality: true
-      });
-
-      setProgress(prev => prev ? {
-        ...prev,
-        stage: 'complete',
-        message: `${generationResult.results.successCount} soru başarıyla üretildi.`,
-        successful: generationResult.results.successCount,
-        failed: generationResult.results.failureCount
-      } : null);
-
-      await fetchQuestions();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Soru üretimi sırasında bir hata oluştu');
-      setProgress(prev => prev ? {
-        ...prev,
-        stage: 'error',
-        message: 'Soru üretimi sırasında bir hata oluştu'
-      } : null);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  }, [fetchQuestions, selectedIds]);
 
   // Yenileme ve temizleme işlemleri
   useEffect(() => {
@@ -196,7 +152,6 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
   }, []);
 
   return {
-    // State exports
     questions,
     isLoading,
     error,
@@ -222,7 +177,6 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     handleUpdateQuestion,
     handleDeleteQuestion,
     handleBulkDelete,
-    generateQuestions,
     
     // Modal control exports
     setEditingQuestion,
