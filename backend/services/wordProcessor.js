@@ -168,14 +168,7 @@ class WordProcessor {
           times_correct: 0,
           is_active: true,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          question_text: null,
-          option_a: null,
-          option_b: null,
-          option_c: null,
-          option_d: null,
-          correct_answer: null,
-          explanation: null
+          updated_at: new Date().toISOString()
         };
 
         results.push(wordData);
@@ -186,29 +179,27 @@ class WordProcessor {
       }
     });
 
-    // Soruları işle
-    const questions = this.parseQuestions(parsedData);
-
-    questions.forEach(question => {
-      const wordData = results.find(result => result.meaning_id === question.meaning_id);
-
-      if (wordData) {
-        wordData.question_text = question.question_text;
-        wordData.option_a = question.option_a;
-        wordData.option_b = question.option_b;
-        wordData.option_c = question.option_c;
-        wordData.option_d = question.option_d;
-        wordData.correct_answer = question.correct_answer;
-        wordData.explanation = question.explanation;
-
-        console.log(`✅ Soru eklendi - Anlam ${question.meaning_id}: ${question.question_text}`);
-      } else {
-        console.warn(`⚠️ Soru eşleşen anlamı bulamadı: meaning_id ${question.meaning_id}`);
-      }
-    });
-
-    console.log(`📊 ${originalWord}: ${results.length}/${parsedData.step2_meanings.length} anlam başarıyla işlendi`);
     return results;
+  }
+
+  // Soruları veritabanına kaydet
+  async saveQuestionsToDatabase(questions) {
+    for (const question of questions) {
+      try {
+        const { error: insertError } = await this.supabase
+          .from('questions')
+          .insert([question]);
+
+        if (insertError) {
+          console.error(`❌ Soru kaydetme hatası (meaning_id: ${question.meaning_id}):`, insertError);
+          continue;
+        }
+
+        console.log(`✅ Soru kaydedildi (meaning_id: ${question.meaning_id})`);
+      } catch (saveError) {
+        console.error(`❌ Soru kaydetme genel hatası (meaning_id: ${question.meaning_id}):`, saveError);
+      }
+    }
   }
 
   // Tek bir kelimeyi işle - GÜNCELLENEN DUPLICATE KONTROL
@@ -277,9 +268,10 @@ class WordProcessor {
               continue;
             }
             
-            const { error: insertError } = await this.supabase
+            const { data: insertedWord, error: insertError } = await this.supabase
               .from('words')
-              .insert([wordData]);
+              .insert([wordData])
+              .select('*'); // Inserted row'u al
             
             if (insertError) {
               if (insertError.code === '23505') {
@@ -292,7 +284,13 @@ class WordProcessor {
             
             addedCount++;
             console.log(`✅ Eklendi: ${wordData.word} - ${wordData.turkish_meaning} (${wordData.part_of_speech})`);
-            
+
+            // Soruları kaydet
+            const questions = this.parseQuestions(geminiData.parsedData);
+            if (questions.length > 0) {
+              // Yeni fonksiyonu çağır
+              await this.saveQuestionsToDatabase(questions);
+            }
           } catch (saveError) {
             console.error(`❌ ${wordData.word} (meaning_id: ${wordData.meaning_id}) kaydetme hatası:`, saveError);
             continue;

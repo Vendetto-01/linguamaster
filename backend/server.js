@@ -173,7 +173,9 @@ app.get('/api/processor/stats', (req, res) => {
 
 // Routes
 const wordRoutes = require('./routes/words');
+const questionRoutes = require('./routes/questions'); // Soru rotalarını ekle
 app.use('/api/words', wordRoutes);
+app.use('/api/questions', questionRoutes); // Soru rotalarını kullan
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -185,6 +187,7 @@ app.use('*', (req, res) => {
       'GET /health',
       'GET /api/system/info',
       'GET /api/words',
+      'GET /api/questions', // Soru rotasını ekle
       'POST /api/words/bulk',
       'POST /api/words/bulk-stream',
       'POST /api/words/upload-file',

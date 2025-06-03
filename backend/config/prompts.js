@@ -80,5 +80,21 @@ Respond ONLY with a valid JSON object in this exact format:
 
 module.exports = {
   WORD_PROCESSOR_PROMPT_TEMPLATE: WORD_PROCESSOR_PROMPT_TEMPLATE,
-  QUESTION_GENERATOR_PROMPT_TEMPLATE: null,
+  QUESTION_GENERATOR_PROMPT_TEMPLATE: (word, meaning) => `Generate a multiple-choice question about the word "${word}" in the context of the following meaning: "${meaning}".
+  The question should have four options (A, B, C, D), with only one correct answer.
+  Also, provide a short explanation of why the correct answer is correct.
+  The question should be appropriate for the difficulty level of the word (beginner, intermediate, or advanced).
+
+  Respond ONLY with a valid JSON object in this exact format:
+  {
+    "question_text": "Complete question here",
+    "option_a": "First option",
+    "option_b": "Second option",
+    "option_c": "Third option",
+    "option_d": "Fourth option",
+    "correct_answer": "A/B/C/D",
+    "explanation": "Why this answer is correct",
+    "difficulty": "beginner|intermediate|advanced"
+  }
+  `
 };
