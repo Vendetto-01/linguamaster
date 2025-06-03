@@ -1,6 +1,6 @@
-// backend/services/wordProcessor.js - UPDATED FOR ACADEMIC SENTENCES, ORIGINAL DIFFICULTY SCHEMA
+// backend/services/wordProcessor.js - SORU KAYDETME DESTEKLİ
 const axios = require('axios');
-const { WORD_PROCESSOR_PROMPT_TEMPLATE } = require('../config/prompts'); // DÜZELTME: Import eklendi
+const { WORD_PROCESSOR_PROMPT_TEMPLATE } = require('../config/prompts');
 
 class WordProcessor {
   constructor(supabase) {
@@ -17,9 +17,9 @@ class WordProcessor {
   }
 
   // Gemini API'den kelime bilgilerini çek
-  async fetchWordFromGeminiAPI(word) { // DÜZELTME: WORD_PROCESSOR_PROMPT_TEMPLATE parametre olarak alınmıyor artık
+  async fetchWordFromGeminiAPI(word) {
     try {
-      const prompt = WORD_PROCESSOR_PROMPT_TEMPLATE(word); // DÜZELTME: Doğrudan import'tan kullanılıyor
+      const prompt = WORD_PROCESSOR_PROMPT_TEMPLATE(word);
 
       console.log(`🤖 Gemini 2.0 Flash - Aşamalı analiz başlatılıyor: ${word}`);
 
@@ -65,7 +65,7 @@ class WordProcessor {
         throw new Error(`JSON parse hatası: ${parseError.message}`);
       }
 
-      // Veri doğrulama - Orijinal format bekleniyor
+      // Veri doğrulama
       if (!parsedData.word || !parsedData.step4_final_difficulty || !parsedData.step2_meanings) {
         throw new Error('Gemini yanıtında gerekli step alanları eksik (word, step4_final_difficulty, step2_meanings)');
       }
@@ -74,23 +74,23 @@ class WordProcessor {
         throw new Error('Gemini yanıtında geçerli meanings bulunamadı (step2_meanings)');
       }
 
-      // Zorluk seviyesi doğrulama (step4_final_difficulty için)
+      // Zorluk seviyesi doğrulama
       const validDifficulties = ['beginner', 'intermediate', 'advanced'];
       if (!validDifficulties.includes(parsedData.step4_final_difficulty)) {
         console.warn(`⚠️ Geçersiz final difficulty: ${parsedData.step4_final_difficulty}, 'intermediate' olarak ayarlanıyor`);
         parsedData.step4_final_difficulty = 'intermediate';
       }
-      // step1_initial_difficulty için de benzer bir doğrulama eklenebilir istenirse.
 
       const meaningCount = parsedData.step2_meanings.length;
+      const questionCount = parsedData.step7_questions ? parsedData.step7_questions.length : 0;
       const initialDiff = parsedData.step1_initial_difficulty; 
       const finalDiff = parsedData.step4_final_difficulty;
       
-      console.log(`✅ ${word} aşamalı analiz başarılı: ${meaningCount} anlam, İlk Zorluk: ${initialDiff}, Son Zorluk: ${finalDiff}`);
+      console.log(`✅ ${word} aşamalı analiz başarılı: ${meaningCount} anlam, ${questionCount} soru, İlk Zorluk: ${initialDiff}, Son Zorluk: ${finalDiff}`);
       
       return {
         rawResponse: geminiResponse,
-        parsedData: parsedData // Bu, orijinal anahtar isimlerini içerecek
+        parsedData: parsedData
       };
 
     } catch (error) {
@@ -107,35 +107,138 @@ class WordProcessor {
     }
   }
 
-  // Soruları parse et
-  parseQuestions(parsedData) {
+  // Soruları parse et ve doğrula
+  parseQuestions(parsedData, word) {
     const questions = [];
 
-    if (parsedData.step7_questions && Array.isArray(parsedData.step7_questions)) {
-      parsedData.step7_questions.forEach(question => {
-        questions.push({
-          meaning_id: question.meaning_id,
-          question_text: question.question_text,
-          option_a: question.option_a,
-          option_b: question.option_b,
-          option_c: question.option_c,
-          option_d: question.option_d,
-          correct_answer: question.correct_answer,
-          explanation: question.explanation,
-          difficulty: question.difficulty
-        });
-      });
+    if (!parsedData.step7_questions || !Array.isArray(parsedData.step7_questions)) {
+      console.warn(`⚠️ ${word} için soru bulunamadı (step7_questions eksik)`);
+      return questions;
     }
+
+    console.log(`📚 ${word} için ${parsedData.step7_questions.length} soru işleniyor...`);
+
+    parsedData.step7_questions.forEach((question, index) => {
+      try {
+        // Gerekli alanları kontrol et
+        const requiredFields = ['meaning_id', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'];
+        const missingFields = requiredFields.filter(field => !question[field]);
+        
+        if (missingFields.length > 0) {
+          console.error(`❌ ${word} - Soru ${index + 1} eksik alanlar: ${missingFields.join(', ')}`);
+          return;
+        }
+
+        // Correct answer doğrulama
+        if (!['A', 'B', 'C', 'D'].includes(question.correct_answer)) {
+          console.error(`❌ ${word} - Soru ${index + 1} geçersiz correct_answer: ${question.correct_answer}`);
+          return;
+        }
+
+        // Difficulty doğrulama
+        const validDifficulties = ['beginner', 'intermediate', 'advanced'];
+        let difficulty = question.difficulty;
+        if (!validDifficulties.includes(difficulty)) {
+          difficulty = parsedData.step4_final_difficulty || 'intermediate';
+          console.warn(`⚠️ ${word} - Soru ${index + 1} geçersiz difficulty, ${difficulty} olarak ayarlandı`);
+        }
+
+        const questionData = {
+          word: word.toLowerCase(),
+          meaning_id: question.meaning_id,
+          question_text: question.question_text.trim(),
+          option_a: question.option_a.trim(),
+          option_b: question.option_b.trim(),
+          option_c: question.option_c.trim(),
+          option_d: question.option_d.trim(),
+          correct_answer: question.correct_answer,
+          explanation: question.explanation ? question.explanation.trim() : 'Açıklama mevcut değil',
+          difficulty: difficulty,
+          part_of_speech: parsedData.step2_meanings.find(m => m.meaning_id === question.meaning_id)?.part_of_speech || 'unknown',
+          source: 'gemini-2.0-flash-001',
+          times_shown: 0,
+          times_correct: 0,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        questions.push(questionData);
+        console.log(`✅ Soru ${index + 1} hazırlandı (meaning_id: ${question.meaning_id}): ${question.question_text.substring(0, 50)}...`);
+        
+      } catch (questionError) {
+        console.error(`❌ ${word} - Soru ${index + 1} işlenirken hata:`, questionError);
+      }
+    });
 
     return questions;
   }
 
-  // Gemini verilerini Supabase formatına dönüştür - Orijinal JSON yapısını bekliyor
+  // Soruları veritabanına kaydet
+  async saveQuestionsToDatabase(questions, word) {
+    if (!questions || questions.length === 0) {
+      console.warn(`⚠️ ${word} için kaydedilecek soru yok`);
+      return { saved: 0, failed: 0 };
+    }
+
+    let savedCount = 0;
+    let failedCount = 0;
+
+    console.log(`💾 ${word} için ${questions.length} soru veritabanına kaydediliyor...`);
+
+    for (const [index, question] of questions.entries()) {
+      try {
+        // Duplicate control
+        const { data: existing, error: checkError } = await this.supabase
+          .from('questions')
+          .select('id')
+          .eq('word', question.word)
+          .eq('meaning_id', question.meaning_id)
+          .eq('question_text', question.question_text)
+          .single();
+        
+        if (checkError && checkError.code !== 'PGRST116') {
+          throw checkError;
+        }
+        
+        if (existing) {
+          console.log(`⚠️ ${word} - Soru ${index + 1} zaten mevcut (meaning_id: ${question.meaning_id})`);
+          continue;
+        }
+
+        // Soruyu kaydet
+        const { data: insertedQuestion, error: insertError } = await this.supabase
+          .from('questions')
+          .insert([question])
+          .select('id')
+          .single();
+
+        if (insertError) {
+          if (insertError.code === '23505') { // Unique constraint violation
+            console.log(`⚠️ ${word} - Soru ${index + 1} duplicate key hatası`);
+            continue;
+          }
+          throw insertError;
+        }
+
+        savedCount++;
+        console.log(`✅ ${word} - Soru ${index + 1} kaydedildi (ID: ${insertedQuestion.id}, meaning_id: ${question.meaning_id})`);
+        
+      } catch (saveError) {
+        failedCount++;
+        console.error(`❌ ${word} - Soru ${index + 1} kaydetme hatası (meaning_id: ${question.meaning_id}):`, saveError);
+      }
+    }
+
+    console.log(`📊 ${word} soru kaydetme özeti: ${savedCount} başarılı, ${failedCount} başarısız`);
+    return { saved: savedCount, failed: failedCount };
+  }
+
+  // Gemini verilerini Supabase formatına dönüştür
   parseGeminiDataForSupabase(geminiData, originalWord) {
     const results = [];
     const { parsedData } = geminiData;
 
-    // Kontrol edilecek anahtar isimleri orijinalde olduğu gibi: step2_meanings
     if (!parsedData || !parsedData.step2_meanings) {
       console.error('❌ Gemini parsedData.step2_meanings eksik veya hatalı');
       return results;
@@ -145,7 +248,6 @@ class WordProcessor {
 
     parsedData.step2_meanings.forEach(meaning => {
       try {
-        // Anahtar isimleri orijinalde olduğu gibi: step3_examples, step5_turkish_translations, step6_word_mappings
         const example = parsedData.step3_examples?.find(ex => ex.meaning_id === meaning.meaning_id);
         const translation = parsedData.step5_turkish_translations?.find(tr => tr.meaning_id === meaning.meaning_id);
         const mapping = parsedData.step6_word_mappings?.find(map => map.meaning_id === meaning.meaning_id);
@@ -155,10 +257,9 @@ class WordProcessor {
           meaning_id: meaning.meaning_id,
           part_of_speech: meaning.part_of_speech ? meaning.part_of_speech.toLowerCase() : 'unknown',
           meaning_description: meaning.meaning_description || 'No description provided',
-          english_example: example ? example.english_sentence : 'No example provided', // Bu cümle artık akademik olacak
+          english_example: example ? example.english_sentence : 'No example provided',
           turkish_sentence: translation ? translation.turkish_sentence : 'Çeviri bulunamadı',
           turkish_meaning: mapping ? mapping.turkish_equivalent : 'Eşleştirme bulunamadı',
-          // Zorluk seviyeleri orijinaldeki gibi alınıyor
           initial_difficulty: parsedData.step1_initial_difficulty || null,
           final_difficulty: parsedData.step4_final_difficulty || 'intermediate',
           difficulty_reasoning: parsedData.step4_difficulty_reasoning || 'No reasoning provided',
@@ -182,31 +283,7 @@ class WordProcessor {
     return results;
   }
 
-  // Soruları veritabanına kaydet
-  async saveQuestionsToDatabase(questions) {
-    for (const question of questions) {
-      try {
-        const questionData = {
-          ...question,
-          paragraph: question.paragraph || '' // Boş değer kontrolü
-        };
-        const { error: insertError } = await this.supabase
-          .from('questions')
-          .insert([questionData]);
-
-        if (insertError) {
-          console.error(`❌ Soru kaydetme hatası (meaning_id: ${question.meaning_id}):`, insertError);
-          continue;
-        }
-
-        console.log(`✅ Soru kaydedildi (meaning_id: ${question.meaning_id})`);
-      } catch (saveError) {
-        console.error(`❌ Soru kaydetme genel hatası (meaning_id: ${question.meaning_id}):`, saveError);
-      }
-    }
-  }
-
-  // Tek bir kelimeyi işle - GÜNCELLENEN DUPLICATE KONTROL
+  // Tek bir kelimeyi işle
   async processOneWord() {
     const startTime = Date.now();
     
@@ -241,8 +318,8 @@ class WordProcessor {
         .eq('id', pendingWord.id);
 
       try {
-        const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word); // DÜZELTME: Sadece kelime gönderiliyor
-        // parseGeminiDataForSupabase fonksiyonu artık orijinal JSON formatını bekliyor ve ona göre çalışacak.
+        // Gemini'den veri çek
+        const geminiData = await this.fetchWordFromGeminiAPI(pendingWord.word);
         const parsedWords = this.parseGeminiDataForSupabase(geminiData, pendingWord.word);
 
         if (parsedWords.length === 0) {
@@ -252,6 +329,7 @@ class WordProcessor {
         let addedCount = 0;
         let duplicateCount = 0;
         
+        // Words tablosuna kaydet
         for (const wordData of parsedWords) {
           try {
             const { data: existing, error: checkError } = await this.supabase
@@ -275,7 +353,7 @@ class WordProcessor {
             const { data: insertedWord, error: insertError } = await this.supabase
               .from('words')
               .insert([wordData])
-              .select('*'); // Inserted row'u al
+              .select('*');
             
             if (insertError) {
               if (insertError.code === '23505') {
@@ -288,44 +366,44 @@ class WordProcessor {
             
             addedCount++;
             console.log(`✅ Eklendi: ${wordData.word} - ${wordData.turkish_meaning} (${wordData.part_of_speech})`);
-
-            // Soruları kaydet
-            const questions = this.parseQuestions(geminiData.parsedData);
-            if (questions.length > 0) {
-              // Yeni fonksiyonu çağır
-              await this.saveQuestionsToDatabase(questions);
-            }
           } catch (saveError) {
             console.error(`❌ ${wordData.word} (meaning_id: ${wordData.meaning_id}) kaydetme hatası:`, saveError);
             continue;
           }
         }
 
+        // Soruları parse et ve kaydet - YENİ
+        const questions = this.parseQuestions(geminiData.parsedData, pendingWord.word);
+        const questionResult = await this.saveQuestionsToDatabase(questions, pendingWord.word);
+
         const processingTime = Date.now() - startTime;
         
+        // Processing log'u kaydet
         await this.supabase
           .from('word_processing_logs')
           .insert([{
             word: pendingWord.word,
             status: 'success',
             processing_time_ms: processingTime,
-            gemini_response: geminiData.rawResponse, // Orijinal Gemini yanıtı
+            gemini_response: geminiData.rawResponse,
             meanings_added: addedCount,
             processed_at: new Date().toISOString()
           }]);
 
+        // Pending word'u sil
         await this.supabase
           .from('pending_words')
           .delete()
           .eq('id', pendingWord.id);
 
-        console.log(`✅ ${pendingWord.word}: ${addedCount} anlam eklendi, ${duplicateCount} duplicate atlandı (${processingTime}ms)`);
+        console.log(`✅ ${pendingWord.word}: ${addedCount} anlam, ${questionResult.saved} soru eklendi, ${duplicateCount} duplicate atlandı (${processingTime}ms)`);
 
         this.processedCount++;
         return { 
           status: 'success', 
           word: pendingWord.word,
           addedDefinitions: addedCount,
+          addedQuestions: questionResult.saved, // YENİ
           duplicateDefinitions: duplicateCount,
           totalDefinitions: parsedWords.length,
           processingTime: processingTime
@@ -411,7 +489,7 @@ class WordProcessor {
           }
 
           if (result.status === 'success') {
-            console.log(`✅ Başarılı: ${result.word} (${result.addedDefinitions} anlam)`);
+            console.log(`✅ Başarılı: ${result.word} (${result.addedDefinitions} anlam, ${result.addedQuestions || 0} soru)`);
           } else if (result.status === 'failed') {
             console.log(`❌ Başarısız: ${result.word} - ${result.reason}`);
           }

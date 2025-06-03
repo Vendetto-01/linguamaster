@@ -1,4 +1,4 @@
-// backend/config/prompts.js
+// backend/config/prompts.js - SORU ÜRETİMİ İLE GÜNCELLENMİŞ
 
 const WORD_PROCESSOR_PROMPT_TEMPLATE = (word) => `Analyze the English word "${word}" step by step. Follow these exact steps:
 
@@ -22,6 +22,13 @@ Translate each English example sentence (from Step 3) into natural, fluent Turki
 
 STEP 6: Word-to-word mapping
 For each English sentence (from Step 3) and its Turkish translation (from Step 5), identify exactly which Turkish word(s) correspond to the original English word "${word}" in that specific context.
+
+STEP 7: Question generation
+For each meaning_id identified in Step 2, create a multiple-choice question that tests understanding of that specific meaning. Each question should:
+- Have 4 options (A, B, C, D) with only one correct answer
+- Be appropriate for the word's difficulty level
+- Include a brief explanation of why the correct answer is right
+- Use the context from the example sentences when relevant
 
 Respond ONLY with a valid JSON object in this exact format:
 {
@@ -61,10 +68,10 @@ Respond ONLY with a valid JSON object in this exact format:
       "meaning_id": 1,
       "question_text": "Complete question here",
       "option_a": "First option",
-      "option_b": "Second option",
+      "option_b": "Second option", 
       "option_c": "Third option",
       "option_d": "Fourth option",
-      "correct_answer": "A/B/C/D",
+      "correct_answer": "A|B|C|D",
       "explanation": "Why this answer is correct",
       "difficulty": "beginner|intermediate|advanced"
     }
@@ -76,6 +83,9 @@ Respond ONLY with a valid JSON object in this exact format:
 - Example sentences in "step3_examples" MUST BE a single, somewhat long, academically challenging sentence per meaning.
 - Turkish translations must be fluent and natural.
 - Word mappings should be precise.
+- Questions should test comprehension of the specific meaning, not general knowledge.
+- Each question must have exactly 4 options and 1 correct answer.
+- Explanations should be brief but clear.
 - Ensure the entire response is a single, valid JSON object.`;
 
 module.exports = {
@@ -92,7 +102,7 @@ module.exports = {
     "option_b": "Second option",
     "option_c": "Third option",
     "option_d": "Fourth option",
-    "correct_answer": "A/B/C/D",
+    "correct_answer": "A|B|C|D",
     "explanation": "Why this answer is correct",
     "difficulty": "beginner|intermediate|advanced"
   }
