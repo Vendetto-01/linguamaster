@@ -62,8 +62,8 @@ export const processPendingReports = async (): Promise<void> => {
   const { data: pendingReports, error: fetchError } = await supabase
     .from('reports')
     .select('*')
-    .eq('status', 'pending') // Still want to process only pending reports
-    .eq('ai_check', false)   // And only those not yet checked by AI
+    // .eq('status', 'pending') // Removed status check as per new requirement
+    .eq('ai_check', false)   // Only check for ai_check === false
     .limit(BATCH_SIZE);
 
   if (fetchError) {
