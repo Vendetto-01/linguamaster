@@ -3,13 +3,15 @@ import type { WordEntry, WordSubmission } from '../types/word.types';
 
 /**
  * Submits a new word to the backend.
- * The backend will then call the Gemini API to get definitions, examples, etc.
+ * The backend will then call the Gemini API to get definitions, examples, etc.,
+ * and may return multiple WordEntry objects if the word has multiple definitions.
  * @param wordSubmission - An object containing the word to submit.
- * @returns A promise that resolves to the newly created WordEntry.
+ * @returns A promise that resolves to an array of newly created WordEntry objects.
  */
-export const addWord = async (wordSubmission: WordSubmission): Promise<WordEntry> => {
+export const addWord = async (wordSubmission: WordSubmission): Promise<WordEntry[]> => {
   try {
-    const response = await apiClient.post<WordEntry>('/words', wordSubmission);
+    // The API now returns WordEntry[]
+    const response = await apiClient.post<WordEntry[]>('/words', wordSubmission);
     return response.data;
   } catch (error: any) {
     // Log the error or handle it more gracefully
