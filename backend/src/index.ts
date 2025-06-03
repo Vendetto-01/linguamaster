@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import wordRoutes from './routes/word.routes';
 import bulkRoutes from './routes/bulk.routes'; // Import bulk routes
-import { startWorkerLoop } from './services/bulkWorker.service'; // Import worker starter
+import { startWorkerLoop } from './workers/bulkWorker.service'; // Import bulk worker starter
+import { startReportWorkerLoop } from './workers/reportWorker.service'; // Import report worker starter
 
 dotenv.config();
 
@@ -48,6 +49,11 @@ app.listen(port, () => {
   const workerInterval = parseInt(process.env.WORKER_INTERVAL_MS || '10000', 10); // Default to 10 seconds
   console.log(`Starting bulk processing worker with interval: ${workerInterval}ms`);
   startWorkerLoop(workerInterval);
+
+  // Start the report processing worker loop
+  const reportWorkerInterval = parseInt(process.env.REPORT_WORKER_INTERVAL_MS || '60000', 10); // Default to 60 seconds
+  console.log(`Starting report processing worker with interval: ${reportWorkerInterval}ms`);
+  startReportWorkerLoop(reportWorkerInterval);
 });
 
 export default app;

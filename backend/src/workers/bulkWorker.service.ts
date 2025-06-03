@@ -1,5 +1,5 @@
 import { supabase } from '../config/supabaseClient';
-import { addWordService } from './word.service'; // The existing service to process a single word
+import { addWordService } from '../services/word.service'; // The existing service to process a single word
 import type { BulkJob, BulkJobWord } from '../types/bulk.types';
 import type { WordEntry } from '../types/word.types';
 

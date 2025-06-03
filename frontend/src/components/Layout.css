@@ -1,0 +1,104 @@
+/* Layout.css */
+.layout-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f4f7f6; /* Light gray background */
+}
+
+.navbar {
+  background-color: #2c3e50; /* Dark blue/charcoal */
+  color: #ecf0f1; /* Light gray/silver text */
+  padding: 0.5rem 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand .navbar-item.brand-text {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ecf0f1;
+  text-decoration: none;
+}
+
+.navbar-brand .navbar-item.brand-text:hover {
+  color: #1abc9c; /* Teal on hover */
+}
+
+.navbar-menu {
+  display: flex;
+  align-items: center;
+}
+
+.navbar-start {
+  display: flex;
+  margin-right: auto; /* Pushes items to the left */
+}
+
+.navbar-item {
+  padding: 0.5rem 0.75rem;
+  color: #ecf0f1;
+  text-decoration: none;
+  position: relative; /* For dropdown positioning */
+}
+
+.navbar-item:hover, .navbar-link:hover {
+  background-color: #34495e; /* Slightly lighter dark blue */
+  color: #1abc9c; /* Teal on hover */
+}
+
+.navbar-link {
+  cursor: pointer;
+  padding-right: 2.5em; /* Space for dropdown arrow */
+}
+
+/* Basic Dropdown Styling */
+.has-dropdown {
+  position: relative;
+}
+
+.navbar-dropdown {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  background-color: #34495e; /* Dropdown background */
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+  z-index: 1000;
+  min-width: 180px;
+}
+
+.has-dropdown:hover .navbar-dropdown {
+  display: block;
+}
+
+.navbar-dropdown .navbar-item {
+  color: #ecf0f1;
+  padding: 0.75rem 1rem;
+  display: block;
+  white-space: nowrap;
+}
+
+.navbar-dropdown .navbar-item:hover {
+  background-color: #2c3e50;
+  color: #1abc9c;
+}
+
+
+.main-content {
+  flex-grow: 1;
+  padding: 2rem;
+  background-color: #ffffff; /* White content area */
+  margin: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.05);
+}
+
+.footer {
+  background-color: #34495e; /* Darker footer */
+  color: #bdc3c7; /* Lighter gray text for footer */
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.9rem;
+}
