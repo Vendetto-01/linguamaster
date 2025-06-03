@@ -174,18 +174,6 @@ app.get('/api/processor/stats', (req, res) => {
 const wordRoutes = require('./routes/words');
 app.use('/api/words', wordRoutes);
 
-const questionWizardQuestionsRoutes = require('./routes/questionWizard/questions');
-app.use('/api/questionWizard/questions', questionWizardQuestionsRoutes);
-
-const questionWizardWordsRoutes = require('./routes/questionWizard/words');
-app.use('/api/questionWizard/words', questionWizardWordsRoutes);
-
-const questionWizardDatabaseInfoRoutes = require('./routes/questionWizard/database-info');
-app.use('/api/questionWizard/database-info', questionWizardDatabaseInfoRoutes);
-
-const questionWizardTestGeminiRoutes = require('./routes/questionWizard/test-gemini');
-app.use('/api/questionWizard/test-gemini', questionWizardTestGeminiRoutes);
-
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
