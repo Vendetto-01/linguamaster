@@ -1,47 +1,14 @@
-/* frontend/src/App.css */
+/* frontend/src/App.css - TEMİZLENMİŞ VERSİYON */
+
+/* Ana uygulama layout'u */
 .App {
-  display: flex; /* Üstbilgi ve altbilgiyi düzgün yerleştirmek için */
-  flex-direction: column; /* İçeriği dikeyde sırala */
-  min-height: 100vh; /* Sayfanın tamamını kaplamasını sağla */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header-old { /* Eski CRA başlığı, eğer kullanılmıyorsa silinebilir */
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Yeni Stiller */
+/* Ana başlık */
 .appMainHeader {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
@@ -76,6 +43,7 @@
   font-weight: bold;
 }
 
+/* Modül navigasyonu */
 .moduleNavigation {
   background-color: #ffffff;
   border-bottom: 2px solid #e9ecef;
@@ -112,7 +80,6 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
-/* Modül renklerine göre aktif border stilleri App.tsx içinde dinamik olarak eklenecek */
 
 .moduleButtonIcon {
   font-size: 32px;
@@ -133,6 +100,7 @@
   margin: 0 auto;
 }
 
+/* Alt sekme navigasyonu */
 .subTabNavigation {
   background-color: #f8f9fa;
   border-bottom: 1px solid #dee2e6;
@@ -143,7 +111,7 @@
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
-  overflow-x: auto; /* Yatayda kaydırma için */
+  overflow-x: auto;
 }
 
 .subTabButton {
@@ -170,7 +138,6 @@
   color: #495057;
   font-weight: bold;
 }
-/* Aktif alt sekme border rengi (words için #007bff, questions için #28a745) App.tsx içinde dinamik olarak eklenecek */
 
 .subTabButtonIcon {
   font-size: 20px;
@@ -188,18 +155,20 @@
   line-height: 1.2;
 }
 
+/* Ana içerik alanı */
 .appContent {
-  flex-grow: 1; /* İçeriğin kalan alanı doldurmasını sağlar */
+  flex-grow: 1;
   background-color: #ffffff;
 }
 
+/* Footer */
 .appFooter {
   background-color: #f8f9fa;
   text-align: center;
   padding: 25px 20px;
   color: #6c757d;
   border-top: 1px solid #dee2e6;
-  margin-top: auto; /* Sayfa içeriği az olsa bile en altta kalmasını sağlar */
+  margin-top: auto;
 }
 
 .appFooterContainer {

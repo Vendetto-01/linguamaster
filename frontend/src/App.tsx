@@ -1,37 +1,31 @@
-// frontend/src/App.tsx - GÜNCELLENMİŞ VERSİYON
+// frontend/src/App.tsx - DÜZELTILMIŞ İMPORT'LAR
 import React, { useState } from 'react';
 import WordsModuleRenderer from './components/layout/WordsModuleRenderer';
 import QuestionsModuleRenderer from './components/layout/QuestionsModuleRenderer';
 
 // Konfigürasyon appConfig.ts'den import ediliyor
 import {
-  modules, // ModuleConfig[] tipinde
-  wordsTabs, // WordsTabConfig[] tipinde
+  modules,
+  wordsTabs,
   APP_VERSION,
   AI_MODEL_NAME,
   DATABASE_PROVIDER
 } from './config/appConfig';
 
-// Merkezi tipler ../types'tan import ediliyor
+// Merkezi tipler types'tan import ediliyor
 import type {
   ModuleType,
   WordsModuleTabId,
   QuestionsModuleTabId,
-  FileUploadResponse // Bu zaten ../types'tan geliyordu
+  FileUploadResponse
 } from './types';
 
 import './App.css';
 
-// ModuleConfig ve WordsTabConfig arayüzleri appConfig.ts içinde kaldı ve oradan gelen
-// modules ve wordsTabs array'leri bu tipleri kullanıyor. App.tsx'in bu arayüzlere
-// doğrudan ihtiyacı yok, sadece array'leri kullanıyor.
-// QuestionsTabType lokal tanımı kaldırıldı, yerine QuestionsModuleTabId import edildi.
-
-
 function App() {
   const [activeModule, setActiveModule] = useState<ModuleType>('words');
-  const [activeWordsTab, setActiveWordsTab] = useState<WordsModuleTabId>('file'); // WordsModuleTabId kullanılıyor
-  const [activeQuestionsTab, setActiveQuestionsTab] = useState<QuestionsModuleTabId>('selection'); // QuestionsModuleTabId kullanılıyor
+  const [activeWordsTab, setActiveWordsTab] = useState<WordsModuleTabId>('file');
+  const [activeQuestionsTab, setActiveQuestionsTab] = useState<QuestionsModuleTabId>('selection');
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastBatchId, setLastBatchId] = useState<string | undefined>();
 
@@ -55,11 +49,11 @@ function App() {
     }
   };
 
-  const handleWordsTabClick = (tabId: WordsModuleTabId) => { // WordsModuleTabId kullanılıyor
+  const handleWordsTabClick = (tabId: WordsModuleTabId) => {
     setActiveWordsTab(tabId);
   };
 
-  const handleQuestionsTabClick = (tabId: QuestionsModuleTabId) => { // QuestionsModuleTabId kullanılıyor
+  const handleQuestionsTabClick = (tabId: QuestionsModuleTabId) => {
     setActiveQuestionsTab(tabId);
   };
 
@@ -80,16 +74,6 @@ function App() {
                     onClick={() => handleWordsTabClick(tab.id)}
                     className={`subTabButton ${activeWordsTab === tab.id ? 'active' : ''}`}
                     style={activeWordsTab === tab.id ? { borderBottomColor: modules.find(m => m.id === 'words')?.color } : {}}
-                    onMouseEnter={(e) => {
-                      if (activeWordsTab !== tab.id) {
-                        e.currentTarget.style.backgroundColor = '#e9ecef';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (activeWordsTab !== tab.id) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }
-                    }}
                   >
                     <div className="subTabButtonIcon">{tab.icon}</div>
                     <div className="subTabButtonLabel">{tab.label}</div>
@@ -100,7 +84,7 @@ function App() {
             </div>
             <main className="appContent">
               <WordsModuleRenderer
-                activeWordsTab={activeWordsTab} // WordsModuleTabId tipinde
+                activeWordsTab={activeWordsTab}
                 lastBatchId={lastBatchId}
                 onFileUploaded={handleFileUploaded}
               />
@@ -112,7 +96,7 @@ function App() {
         return (
           <main className="appContent">
             <QuestionsModuleRenderer
-              activeQuestionsTab={activeQuestionsTab} // QuestionsModuleTabId tipinde
+              activeQuestionsTab={activeQuestionsTab}
               refreshKey={refreshKey}
               onQuestionsTabChange={handleQuestionsTabClick}
               onQuestionsRefresh={handleQuestionsRefresh}
@@ -122,18 +106,13 @@ function App() {
       
       default:
         return (
-          <div>
-            <div className="subTabNavigation">
-              {/* ... */}
-            </div>
-            <main className="appContent">
-              <WordsModuleRenderer
-                activeWordsTab={'file'}
-                lastBatchId={lastBatchId}
-                onFileUploaded={handleFileUploaded}
-              />
-            </main>
-          </div>
+          <main className="appContent">
+            <WordsModuleRenderer
+              activeWordsTab={'file'}
+              lastBatchId={lastBatchId}
+              onFileUploaded={handleFileUploaded}
+            />
+          </main>
         );
     }
   };
@@ -158,18 +137,6 @@ function App() {
               onClick={() => handleModuleClick(module.id)}
               className={`moduleButton ${activeModule === module.id ? 'active' : ''}`}
               style={activeModule === module.id ? { borderBottomColor: module.color, color: module.color } : {}}
-              onMouseEnter={(e) => {
-                if (activeModule !== module.id) {
-                  e.currentTarget.style.backgroundColor = '#e9ecef';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeModule !== module.id) {
-                  e.currentTarget.style.backgroundColor = '#f8f9fa';
-                  e.currentTarget.style.transform = 'none';
-                }
-              }}
             >
               <div className="moduleButtonIcon">{module.icon}</div>
               <div className="moduleButtonTitle">{module.title}</div>
@@ -183,7 +150,30 @@ function App() {
 
       <footer className="appFooter">
         <div className="appFooterContainer">
-          {/* ... footer içeriği ... */}
+          <div className="appFooterGrid">
+            <div>
+              <h4>🤖 AI Teknolojisi</h4>
+              <p>Gemini 2.0 Flash model ile 6 aşamalı analiz</p>
+              <p>Context-aware soru oluşturma</p>
+              <p>Akademik kalitede çeldiriciler</p>
+            </div>
+            <div>
+              <h4>📊 Veri Yönetimi</h4>
+              <p>Supabase veritabanı entegrasyonu</p>
+              <p>Real-time queue processing</p>
+              <p>Toplu dosya yükleme desteği</p>
+            </div>
+            <div>
+              <h4>⚡ Performans</h4>
+              <p>TypeScript tip güvenliği</p>
+              <p>Modüler React mimarisi</p>
+              <p>Responsive tasarım</p>
+            </div>
+          </div>
+          <div className="appFooterBottom">
+            <p>&copy; 2024 Word Wizard Admin Panel v{APP_VERSION}</p>
+            <p>Gemini 2.0 Flash AI • Supabase Database • React TypeScript</p>
+          </div>
         </div>
       </footer>
     </div>

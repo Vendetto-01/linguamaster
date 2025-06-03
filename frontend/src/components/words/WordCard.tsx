@@ -1,31 +1,22 @@
-// frontend/src/components/words/WordCard.tsx
+// frontend/src/components/words/WordCard.tsx - DÜZELTILMIŞ VERSİYON
 import React from 'react';
 import Card from '../shared/Card';
-
-interface Word {
-  id: number;
-  word: string;
-  meaning_id: number;
-  part_of_speech: string;
-  meaning_description: string;
-  english_example: string;
-  turkish_meaning: string;
-  final_difficulty: string;
-  created_at: string;
-}
+import type { Word } from '../../types';
 
 interface WordCardProps {
   word: Word;
-  isSelected: boolean;
-  onToggle: (word: Word) => void;
+  isSelected?: boolean;
+  onToggle?: (word: Word) => void;
   showActions?: boolean;
+  onCardClick?: () => void; // Ek click handler
 }
 
 const WordCard: React.FC<WordCardProps> = ({
   word,
-  isSelected,
+  isSelected = false,
   onToggle,
-  showActions = false
+  showActions = false,
+  onCardClick
 }) => {
   const getDifficultyColor = (difficulty: string): string => {
     switch (difficulty) {
@@ -37,13 +28,17 @@ const WordCard: React.FC<WordCardProps> = ({
   };
 
   const handleCardClick = () => {
-    onToggle(word);
+    if (onCardClick) {
+      onCardClick();
+    } else if (onToggle) {
+      onToggle(word);
+    }
   };
 
   return (
     <Card 
       isSelected={isSelected}
-      isClickable={true}
+      isClickable={!!(onToggle || onCardClick)}
       onClick={handleCardClick}
     >
       {/* Header */}
@@ -96,13 +91,15 @@ const WordCard: React.FC<WordCardProps> = ({
         </div>
         
         {/* Selection Indicator */}
-        <div style={{ 
-          fontSize: '24px', 
-          color: isSelected ? '#28a745' : '#dee2e6',
-          marginLeft: '10px'
-        }}>
-          {isSelected ? '✅' : '⭕'}
-        </div>
+        {(onToggle || onCardClick) && (
+          <div style={{ 
+            fontSize: '24px', 
+            color: isSelected ? '#28a745' : '#dee2e6',
+            marginLeft: '10px'
+          }}>
+            {isSelected ? '✅' : '⭕'}
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -152,7 +149,10 @@ const WordCard: React.FC<WordCardProps> = ({
           fontSize: '12px',
           color: '#6c757d'
         }}>
-          Oluşturulma: {new Date(word.created_at).toLocaleDateString('tr-TR')}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Oluşturulma: {new Date(word.created_at).toLocaleDateString('tr-TR')}</span>
+            <span>Kaynak: {word.source || 'AI'}</span>
+          </div>
         </div>
       )}
     </Card>

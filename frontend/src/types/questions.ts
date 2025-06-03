@@ -1,8 +1,8 @@
-// frontend/src/types/questions.ts - SORU YÖNETİMİ TYPE TANIMLARI
+// frontend/src/types/questions.ts - TEMİZLENMİŞ VE DÜZELTİLMİŞ VERSİYON
 
-// Question entity
+// Ana Question entity
 export interface Question {
-  id: number;
+  id: string; // Backend'de number, frontend'de string olarak handle ediliyor
   word_id: number;
   question_text: string;
   option_a: string;
@@ -12,7 +12,7 @@ export interface Question {
   correct_answer: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
-  paragraph: string; // example sentence used for context
+  paragraph: string;
   times_shown: number;
   times_correct: number;
   is_active: boolean;
@@ -21,6 +21,7 @@ export interface Question {
   
   // İlişkili kelime bilgileri (JOIN ile gelir)
   word?: {
+    id: number;
     word: string;
     meaning_id: number;
     part_of_speech: string;
@@ -28,14 +29,37 @@ export interface Question {
     turkish_meaning: string;
     final_difficulty: string;
   };
+
+  // Frontend için ek alanlar (opsiyonel)
+  options?: string[];
+  correct_options?: string[];
+  type?: string;
 }
 
-// Question generation request
-export interface QuestionGenerationRequest {
+// API Request/Response Types
+export interface QuestionGenerationConfig {
   wordIds: number[];
+  // Ek konfigürasyon seçenekleri eklenebilir
+  maxConcurrent?: number;
+  validateQuality?: boolean;
 }
 
-// Question generation response
+export type QuestionGenerationRequest = QuestionGenerationConfig;
+
+export interface QuestionGenerationResult {
+  word: string;
+  wordId: number;
+  questionId: number;
+  processingTime?: number;
+}
+
+export interface QuestionGenerationFailure {
+  word: string;
+  wordId: number;
+  reason: string;
+  error?: string;
+}
+
 export interface QuestionGenerationResponse {
   message: string;
   results: {
@@ -44,55 +68,54 @@ export interface QuestionGenerationResponse {
     total: number;
     successCount: number;
     failureCount: number;
-    processingTime: number;
+    processingTime?: number;
   };
   summary: {
     generated: number;
     failed: number;
-    duplicate: number;
     total: number;
   };
 }
 
-// Single question generation result
-export interface QuestionGenerationResult {
-  word: string;
-  wordId: number;
-  questionId: number;
-  processingTime: number;
+// Pagination ve Filtering
+export interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  hasNext: boolean;
+  hasPrev: boolean;
 }
 
-// Question generation failure
-export interface QuestionGenerationFailure {
-  word: string;
-  wordId: number;
-  reason: string;
-  error?: string;
+export interface QuestionFilterParams {
+  searchTerm?: string;
+  difficulty?: string;
+  type?: string;
+  source?: string;
+  hasEmbedding?: boolean;
+  page?: number;
+  limit?: number;
 }
 
-// Questions API response with pagination
-export interface QuestionsResponse {
-  questions: Question[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalQuestions: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
+export interface QuestionSortParams {
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
 }
 
-// Question management filters
-export interface QuestionFilters {
-  search?: string;
-  difficulty?: 'beginner' | 'intermediate' | 'advanced' | '';
-  partOfSpeech?: string;
-  isActive?: boolean;
-  sortBy?: 'created_at' | 'word' | 'difficulty' | 'times_shown';
-  sortOrder?: 'asc' | 'desc';
+export interface PaginatedQuestionsResponse {
+  data: Question[];
+  pagination: PaginationInfo;
 }
 
-// Question statistics
+// Bulk Operations
+export interface BulkActionResponse {
+  message: string;
+  deletedCount: number;
+  failedCount: number;
+  errors: string[];
+}
+
+// Statistics
 export interface QuestionStats {
   totalQuestions: number;
   activeQuestions: number;
@@ -102,7 +125,7 @@ export interface QuestionStats {
     advanced: number;
   };
   partOfSpeechBreakdown: Record<string, number>;
-  recentQuestions: number; // Son 24 saatte oluşturulan
+  recentQuestions: number;
   averageCorrectRate: number;
   mostShownWords: Array<{
     word: string;
@@ -112,27 +135,40 @@ export interface QuestionStats {
   }>;
 }
 
-// Bulk question operations
-export interface BulkQuestionOperation {
-  questionIds: number[];
-  operation: 'activate' | 'deactivate' | 'delete';
+// Content Quality Assessment
+export interface QuestionContentQuality {
+  score: number; // 0-100
+  factors: {
+    clarityScore: number;
+    difficultyAlignment: number;
+    distractorQuality: number;
+    explanationQuality: number;
+  };
+  suggestions: string[];
+  isAcceptable: boolean;
 }
 
-export interface BulkQuestionResponse {
-  message: string;
-  affected: number;
-  failed: number;
-  errors?: string[];
-}
-
-// Question validation
-export interface QuestionValidation {
+export interface QuestionValidationResponse {
   isValid: boolean;
-  errors: string[];
-  warnings: string[];
+  validationId: string;
+  timestamp: string;
+  comments?: string;
 }
 
-// Component props types
+export interface GeneratedQuestionPayload {
+  word_id: number;
+  question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_answer: 'A' | 'B' | 'C' | 'D';
+  explanation: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  paragraph: string;
+}
+
+// Component Props (temizlenmiş)
 export interface QuestionGenerationProps {
   selectedWords: Array<{
     id: number;
@@ -149,18 +185,19 @@ export interface QuestionGenerationProps {
 }
 
 export interface QuestionManagementProps {
-  refreshKey: number;
+  refreshKey?: number;
 }
 
 export interface QuestionCardProps {
   question: Question;
-  onUpdate?: (question: Question) => void;
-  onDelete?: (questionId: number) => void;
-  onToggleActive?: (questionId: number, isActive: boolean) => void;
-  showActions?: boolean;
+  isSelected: boolean;
+  onSelect: (questionId: string) => void;
+  onToggleActive: (questionId: string) => void;
+  onDelete: (questionId: string) => void;
+  isUpdating?: boolean;
 }
 
-// Progress tracking for question generation
+// Progress Tracking
 export interface QuestionGenerationProgress {
   current: number;
   total: number;
@@ -174,28 +211,5 @@ export interface QuestionGenerationProgress {
   estimatedTimeRemaining?: number;
 }
 
-// Question generation settings
-export interface QuestionGenerationSettings {
-  maxConcurrent: number;
-  retryAttempts: number;
-  timeoutMs: number;
-  rateLimit: number; // milliseconds between requests
-  validateQuality: boolean;
-  autoActivate: boolean;
-}
-
-// Question quality metrics
-export interface QuestionQuality {
-  score: number; // 0-100
-  factors: {
-    clarityScore: number;
-    difficultyAlignment: number;
-    distractorQuality: number;
-    explanationQuality: number;
-  };
-  suggestions: string[];
-  isAcceptable: boolean;
-}
-
-// Export default empty object to make it a module
-export default {};
+// Re-export for backward compatibility
+export type QuestionFilters = QuestionFilterParams;

@@ -1,7 +1,32 @@
-// frontend/src/components/QueueStatus.tsx - OPTİMİZE EDİLMİŞ VERSİYON
+// frontend/src/components/words/QueueStatus.tsx - DÜZELTILMIŞ VERSİYON
 import React, { useState, useEffect, useCallback } from 'react';
 import { wordApi } from '../../services/api';
-import { QueueStats, ProcessorStats, QueueStatusProps } from '../types';
+
+// Type tanımları düzeltildi
+interface QueueStats {
+  totalPendingWords: number;
+  totalProcessingWords: number;
+  totalFailedWords: number;
+  activeBatches: number;
+  oldestPendingWord: {
+    word: string;
+    created_at: string;
+  } | null;
+  isQueueActive: boolean;
+  processorStats: {
+    isProcessing: boolean;
+    processedCount: number;
+    errorCount: number;
+    elapsedTime: number;
+    analysisMethod?: string;
+  };
+}
+
+interface QueueStatusProps {
+  batchId?: string;
+  autoRefresh?: boolean;
+  refreshInterval?: number;
+}
 
 const QueueStatus: React.FC<QueueStatusProps> = ({ 
   batchId, 
@@ -13,6 +38,35 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // Status indicator component - yeniden kullanılabilir
+  const StatusIndicator: React.FC<{ 
+    isActive: boolean; 
+    label: string; 
+    activeColor?: string;
+    inactiveColor?: string;
+  }> = ({ isActive, label, activeColor = '#28a745', inactiveColor = '#6c757d' }) => (
+    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
+      <div style={{
+        width: '12px',
+        height: '12px',
+        borderRadius: '50%',
+        backgroundColor: isActive ? activeColor : inactiveColor,
+        marginRight: '8px',
+        animation: isActive ? 'pulse 2s infinite' : 'none'
+      }} />
+      <span style={{ color: isActive ? activeColor : inactiveColor, fontWeight: 'bold' }}>
+        {label}
+      </span>
+      <style>{`
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
 
   // Queue stats'ı getir
   const fetchQueueStats = useCallback(async () => {
@@ -87,41 +141,11 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
         await wordApi.processor.stop();
       }
       
-      // Stats'ı yenile
       await fetchQueueStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Processor ${action} hatası`);
     }
   };
-
-  // Status indicator component
-  const StatusIndicator: React.FC<{ 
-    isActive: boolean; 
-    label: string; 
-    activeColor?: string;
-    inactiveColor?: string;
-  }> = ({ isActive, label, activeColor = '#28a745', inactiveColor = '#6c757d' }) => (
-    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
-      <div style={{
-        width: '12px',
-        height: '12px',
-        borderRadius: '50%',
-        backgroundColor: isActive ? activeColor : inactiveColor,
-        marginRight: '8px',
-        animation: isActive ? 'pulse 2s infinite' : 'none'
-      }} />
-      <span style={{ color: isActive ? activeColor : inactiveColor, fontWeight: 'bold' }}>
-        {label}
-      </span>
-      <style>{`
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.5; }
-          100% { opacity: 1; }
-        }
-      `}</style>
-    </div>
-  );
 
   // Loading state
   if (isLoading && !queueStats) {
@@ -178,7 +202,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
         </div>
       )}
 
-      {/* Gelişmiş Processor Status */}
+      {/* Processor Status */}
       {queueStats && (
         <div style={{
           backgroundColor: '#f8f9fa',
@@ -189,7 +213,6 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
         }}>
           <h3 style={{ marginTop: 0 }}>🤖 Gemini 2.0 Flash Aşamalı Processor</h3>
           
-          {/* Analysis Method Badge */}
           <div style={{ marginBottom: '15px' }}>
             <span style={{
               backgroundColor: '#007bff',
@@ -227,9 +250,6 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               <div style={{ fontSize: '24px', color: '#28a745' }}>
                 {queueStats.processorStats.processedCount}
               </div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                (Her kelime çoklu anlam)
-              </div>
             </div>
 
             <div>
@@ -239,7 +259,6 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               </div>
             </div>
 
-            {/* Processing Hızı */}
             <div>
               <div style={{ fontWeight: 'bold' }}>⚡ İşlem Hızı</div>
               <div style={{ fontSize: '16px', color: '#6f42c1' }}>
@@ -248,14 +267,11 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
                   : '0 kel/dk'
                 }
               </div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                kelime/dakika
-              </div>
             </div>
           </div>
 
           {/* Processor Control */}
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
             <button
               onClick={() => handleProcessorControl('start')}
               disabled={queueStats.processorStats.isProcessing}
@@ -268,7 +284,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
                 cursor: queueStats.processorStats.isProcessing ? 'not-allowed' : 'pointer'
               }}
             >
-              ▶️ Aşamalı Analizi Başlat
+              ▶️ Başlat
             </button>
             <button
               onClick={() => handleProcessorControl('stop')}
@@ -285,22 +301,6 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               ⏹️ Durdur
             </button>
           </div>
-          
-          {/* Aşamalı Analiz Açıklaması */}
-          {queueStats.processorStats.isProcessing && (
-            <div style={{
-              marginTop: '15px',
-              padding: '10px',
-              backgroundColor: '#e7f3ff',
-              borderRadius: '5px',
-              fontSize: '14px'
-            }}>
-              <strong>🔄 6 Aşamalı Analiz Süreci:</strong>
-              <br />
-              1️⃣ İlk zorluk tahmini → 2️⃣ Anlam tespiti → 3️⃣ Akademik örnekler → 
-              4️⃣ Zorluk doğrulama → 5️⃣ Türkçe çeviri → 6️⃣ Kelime eşleştirme
-            </div>
-          )}
         </div>
       )}
 
@@ -326,10 +326,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#856404' }}>
                 {queueStats.totalPendingWords}
               </div>
-              <div style={{ fontSize: '14px', color: '#856404' }}>Bekleyen Kelime</div>
-              <div style={{ fontSize: '12px', color: '#856404', marginTop: '5px' }}>
-                (6 aşamalı analiz için)
-              </div>
+              <div style={{ fontSize: '14px', color: '#856404' }}>Bekleyen</div>
             </div>
 
             <div style={{ textAlign: 'center', padding: '15px', backgroundColor: '#cce5ff', borderRadius: '5px' }}>
@@ -338,9 +335,6 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
                 {queueStats.totalProcessingWords}
               </div>
               <div style={{ fontSize: '14px', color: '#004085' }}>İşleniyor</div>
-              <div style={{ fontSize: '12px', color: '#004085', marginTop: '5px' }}>
-                (AI analiz aşamasında)
-              </div>
             </div>
 
             <div style={{ textAlign: 'center', padding: '15px', backgroundColor: '#f8d7da', borderRadius: '5px' }}>
@@ -349,9 +343,6 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
                 {queueStats.totalFailedWords}
               </div>
               <div style={{ fontSize: '14px', color: '#721c24' }}>Başarısız</div>
-              <div style={{ fontSize: '12px', color: '#721c24', marginTop: '5px' }}>
-                (3 deneme sonrası)
-              </div>
             </div>
 
             <div style={{ textAlign: 'center', padding: '15px', backgroundColor: '#e2e3e5', borderRadius: '5px' }}>
@@ -363,14 +354,12 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
             </div>
           </div>
 
-          {/* Queue Activity Status */}
           <StatusIndicator 
             isActive={queueStats.isQueueActive}
             label={queueStats.isQueueActive ? 'Queue Aktif' : 'Queue Boş'}
             activeColor="#007bff"
           />
 
-          {/* Oldest Pending Word */}
           {queueStats.oldestPendingWord && (
             <div style={{ 
               marginTop: '15px',
@@ -395,8 +384,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
           backgroundColor: '#e8f4f8',
           border: '1px solid #bee5eb',
           borderRadius: '8px',
-          padding: '20px',
-          marginBottom: '20px'
+          padding: '20px'
         }}>
           <h3 style={{ marginTop: 0 }}>🆔 Batch Durumu</h3>
           
@@ -416,8 +404,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
-            gap: '10px',
-            marginBottom: '15px'
+            gap: '10px'
           }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#856404' }}>
@@ -447,28 +434,6 @@ const QueueStatus: React.FC<QueueStatusProps> = ({
               <div style={{ fontSize: '12px' }}>Başarısız</div>
             </div>
           </div>
-
-          <StatusIndicator 
-            isActive={batchStatus.status === 'processing'}
-            label={batchStatus.status === 'processing' ? '6 Aşamalı Analiz Devam Ediyor' : 'Batch Tamamlandı'}
-            activeColor="#007bff"
-            inactiveColor="#28a745"
-          />
-        </div>
-      )}
-
-      {/* Auto Refresh Info */}
-      {autoRefresh && (
-        <div style={{
-          fontSize: '12px',
-          color: '#6c757d',
-          textAlign: 'center',
-          padding: '10px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '5px'
-        }}>
-          🔄 Otomatik yenileme aktif ({refreshInterval / 1000} saniye aralıklarla) | 
-          ⚡ Gemini 2.0 Flash 6 Aşamalı Analiz Sistemi
         </div>
       )}
     </div>
