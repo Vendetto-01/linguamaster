@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-// POST /api/words/bulk-stream - Real-time progress ile toplu kelime ekleme
+// POST /api/words/bulk-stream - Real-time progress ile toplu kelime ekleme - AYNI
 router.post('/bulk-stream', async (req, res) => {
   try {
     const { words } = req.body;
@@ -219,7 +219,7 @@ router.post('/bulk-stream', async (req, res) => {
   }
 });
 
-// POST /api/words/bulk - Eski endpoint (geriye uyumluluk için)
+// POST /api/words/bulk - Eski endpoint (geriye uyumluluk için) - AYNI
 router.post('/bulk', async (req, res) => {
   try {
     const { words } = req.body;
@@ -338,7 +338,7 @@ router.post('/bulk', async (req, res) => {
   }
 });
 
-// GET /api/words - Gelişmiş kelime listesi (gruplu format destekli)
+// YENİ: GET /api/words - Gelişmiş kelime listesi (gruplu format destekli)
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -461,7 +461,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/words/group/:word - Belirli kelimenin tüm anlamları
+// YENİ: GET /api/words/group/:word - Belirli kelimenin tüm anlamları
 router.get('/group/:word', async (req, res) => {
   try {
     const { word } = req.params;
@@ -520,7 +520,7 @@ router.get('/group/:word', async (req, res) => {
   }
 });
 
-// GET /api/words/:word/meaning/:meaningId - Belirli anlam
+// YENİ: GET /api/words/:word/meaning/:meaningId - Belirli anlam
 router.get('/:word/meaning/:meaningId', async (req, res) => {
   try {
     const { word, meaningId } = req.params;
@@ -554,7 +554,183 @@ router.get('/:word/meaning/:meaningId', async (req, res) => {
   }
 });
 
-// GET /api/words/random - Gelişmiş rastgele kelimeler
+// YENİ: GET /api/words/stats - Gelişmiş istatistikler
+router.get('/stats', async (req, res) => {
+  try {
+    // Toplam unique kelime sayısı
+    const { data: uniqueWords, error: uniqueError } = await req.supabase
+      .from('words')
+      .select('word')
+      .eq('is_active', true);
+    
+    if (uniqueError && uniqueError.code !== 'PGRST116') {
+      throw uniqueError;
+    }
+    
+    const totalWords = uniqueWords ? [...new Set(uniqueWords.map(w => w.word))].length : 0;
+    
+    // Toplam anlam sayısı
+    const { count: totalMeanings, error: countError } = await req.supabase
+      .from('words')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true);
+    
+    if (countError && countError.code !== 'PGRST116') {
+      throw countError;
+    }
+    
+    // Kelime türü istatistikleri
+    const { data: partOfSpeechData, error: posError } = await req.supabase
+      .from('words')
+      .select('part_of_speech')
+      .eq('is_active', true);
+    
+    let partOfSpeechStats = [];
+    if (!posError && partOfSpeechData) {
+      const grouped = partOfSpeechData.reduce((acc, item) => {
+        const pos = item.part_of_speech || 'unknown';
+        acc[pos] = (acc[pos] || 0) + 1;
+        return acc;
+      }, {});
+      
+      partOfSpeechStats = Object.entries(grouped)
+        .map(([pos, count]) => ({ _id: pos, count }))
+        .sort((a, b) => b.count - a.count);
+    }
+    
+    // İlk zorluk istatistikleri
+    const { data: initialDiffData, error: initialDiffError } = await req.supabase
+      .from('words')
+      .select('initial_difficulty')
+      .eq('is_active', true)
+      .not('initial_difficulty', 'is', null);
+    
+    let initialDifficultyStats = [];
+    if (!initialDiffError && initialDiffData) {
+      const grouped = initialDiffData.reduce((acc, item) => {
+        const diff = item.initial_difficulty;
+        acc[diff] = (acc[diff] || 0) + 1;
+        return acc;
+      }, {});
+      
+      initialDifficultyStats = Object.entries(grouped)
+        .map(([difficulty, count]) => ({ _id: difficulty, count, type: 'initial' }));
+    }
+    
+    // Final zorluk istatistikleri
+    const { data: finalDiffData, error: finalDiffError } = await req.supabase
+      .from('words')
+      .select('final_difficulty')
+      .eq('is_active', true);
+    
+    let finalDifficultyStats = [];
+    if (!finalDiffError && finalDiffData) {
+      const grouped = finalDiffData.reduce((acc, item) => {
+        const diff = item.final_difficulty || 'intermediate';
+        acc[diff] = (acc[diff] || 0) + 1;
+        return acc;
+      }, {});
+      
+      finalDifficultyStats = Object.entries(grouped)
+        .map(([difficulty, count]) => ({ _id: difficulty, count, type: 'final' }));
+    }
+    
+    // Zorluk değişimi istatistikleri
+    const { data: diffChangeData, error: diffChangeError } = await req.supabase
+      .from('words')
+      .select('initial_difficulty, final_difficulty')
+      .eq('is_active', true)
+      .not('initial_difficulty', 'is', null);
+    
+    let difficultyChangeStats = { upgraded: 0, downgraded: 0, unchanged: 0 };
+    if (!diffChangeError && diffChangeData) {
+      const difficultyOrder = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 };
+      
+      diffChangeData.forEach(item => {
+        const initial = difficultyOrder[item.initial_difficulty];
+        const final = difficultyOrder[item.final_difficulty];
+        
+        if (final > initial) {
+          difficultyChangeStats.upgraded++;
+        } else if (final < initial) {
+          difficultyChangeStats.downgraded++;
+        } else {
+          difficultyChangeStats.unchanged++;
+        }
+      });
+    }
+
+    // Queue istatistikleri
+    const { count: pendingCount, error: pendingError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
+    const { count: processingCount, error: processingError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'processing');
+
+    const { count: failedCount, error: failedError } = await req.supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'failed');
+    
+    // Ortalama anlam sayısı
+    const averageMeaningsPerWord = totalWords > 0 ? (totalMeanings || 0) / totalWords : 0;
+    
+    res.json({
+      totalWords: totalWords,
+      totalDefinitions: totalMeanings || 0, // Geriye uyumluluk
+      totalMeanings: totalMeanings || 0,
+      averageMeaningsPerWord: parseFloat(averageMeaningsPerWord.toFixed(2)),
+      partOfSpeechStats,
+      initialDifficultyStats,
+      finalDifficultyStats,
+      difficultyStats: finalDifficultyStats, // Geriye uyumluluk
+      difficultyChangeStats,
+      queueStats: {
+        pending: pendingCount || 0,
+        processing: processingCount || 0,
+        failed: failedCount || 0
+      },
+      lastUpdated: new Date().toISOString(),
+      database: 'Supabase PostgreSQL',
+      apiSource: 'Gemini 2.0 Flash API',
+      analysisMethod: 'step-by-step'
+    });
+    
+  } catch (error) {
+    console.error('❌ İstatistik hatası:', error);
+    
+    if (error.code === 'PGRST116') {
+      return res.json({
+        totalWords: 0,
+        totalDefinitions: 0,
+        totalMeanings: 0,
+        averageMeaningsPerWord: 0,
+        partOfSpeechStats: [],
+        initialDifficultyStats: [],
+        finalDifficultyStats: [],
+        difficultyStats: [],
+        difficultyChangeStats: { upgraded: 0, downgraded: 0, unchanged: 0 },
+        queueStats: { pending: 0, processing: 0, failed: 0 },
+        lastUpdated: new Date().toISOString(),
+        database: 'Supabase PostgreSQL',
+        apiSource: 'Gemini 2.0 Flash API',
+        analysisMethod: 'step-by-step',
+        message: 'Tablo henüz oluşturulmamış'
+      });
+    }
+    
+    res.status(500).json({
+      error: 'İstatistikler yüklenirken hata oluştu',
+      message: error.message
+    });
+  }
+});
+
+// YENİ: GET /api/words/random - Gelişmiş rastgele kelimeler
 router.get('/random', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
@@ -631,7 +807,53 @@ router.get('/random', async (req, res) => {
   }
 });
 
-// POST /api/words/upload-file - Dosyadan kelime yükleme
+// DELETE /api/words/clear - Tüm kelimeleri temizle (geliştirme için) - AYNI
+router.delete('/clear', async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({
+        error: 'Bu işlem production ortamında kullanılamaz'
+      });
+    }
+    
+    // Words tablosunu temizle
+    const { error: wordsError } = await req.supabase
+      .from('words')
+      .delete()
+      .neq('id', 0); // Tüm kayıtları sil
+
+    // Pending words tablosunu temizle
+    const { error: pendingError } = await req.supabase
+      .from('pending_words')
+      .delete()
+      .neq('id', 0);
+
+    // Processing logs'u temizle
+    const { error: logsError } = await req.supabase
+      .from('word_processing_logs')
+      .delete()
+      .neq('id', 0);
+    
+    if (wordsError || pendingError || logsError) {
+      throw wordsError || pendingError || logsError;
+    }
+    
+    res.json({
+      message: 'Tüm kelimeler ve queue temizlendi',
+      database: 'Supabase',
+      clearedTables: ['words', 'pending_words', 'word_processing_logs']
+    });
+    
+  } catch (error) {
+    console.error('❌ Temizleme hatası:', error);
+    res.status(500).json({
+      error: 'Temizleme sırasında hata oluştu',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/words/upload-file - Dosyadan kelime yükleme - AYNI
 router.post('/upload-file', async (req, res) => {
   try {
     const { words, fileName } = req.body;
@@ -746,7 +968,7 @@ router.post('/upload-file', async (req, res) => {
   }
 });
 
-// GET /api/words/queue-status/:batchId - Queue durumunu kontrol et
+// GET /api/words/queue-status/:batchId - Queue durumunu kontrol et - AYNI
 router.get('/queue-status/:batchId', async (req, res) => {
   try {
     const { batchId } = req.params;
@@ -806,7 +1028,7 @@ router.get('/queue-status/:batchId', async (req, res) => {
   }
 });
 
-// GET /api/words/queue-stats - Genel queue istatistikleri
+// GET /api/words/queue-stats - Genel queue istatistikleri - GÜNCELLEME
 router.get('/queue-stats', async (req, res) => {
   try {
     // Toplam pending kelimeler
@@ -852,7 +1074,7 @@ router.get('/queue-stats', async (req, res) => {
       .limit(1)
       .single();
 
-    // Processor durumu
+    // Processor durumu - GÜNCELLEME
     const processorStats = req.wordProcessor.getStats();
 
     res.json({
@@ -864,7 +1086,7 @@ router.get('/queue-stats', async (req, res) => {
       isQueueActive: (totalPending || 0) > 0,
       processorStats: {
         ...processorStats,
-        analysisMethod: 'step-by-step'
+        analysisMethod: 'step-by-step' // YENİ
       },
       lastUpdate: new Date().toISOString()
     });
