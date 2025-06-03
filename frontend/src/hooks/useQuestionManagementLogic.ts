@@ -1,212 +1,199 @@
 // frontend/src/hooks/useQuestionManagementLogic.ts
 import { useState, useEffect, useCallback } from 'react';
-import { questionsApi } from '../services/questionsApi';
-import type {
+import { questionsApi } from '../api/questionsApi';
+import { 
   Question,
-  PaginationInfo,
   QuestionFilterParams,
   QuestionSortParams,
-  BulkActionResponse,
-} from '../types/questions'; // Tipler questions.ts'den
-
-const DEFAULT_PAGE_SIZE = 10;
+  PaginationInfo,
+  QuestionGenerationProgress
+} from '../types/questions';
 
 interface UseQuestionManagementLogicProps {
-  initialPageSize?: number;
-  // Parent component'ten gelebilecek diğer başlangıç değerleri veya callback'ler
+  refreshKey?: number;
 }
 
-export const useQuestionManagementLogic = ({
-  initialPageSize = DEFAULT_PAGE_SIZE,
-}: UseQuestionManagementLogicProps = {}) => {
+export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagementLogicProps) => {
+  // State tanımlamaları
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const [filters, setFilters] = useState<QuestionFilterParams>({
-    searchTerm: '',
-    difficulty: '',
-    type: '',
-    source: '',
-    hasEmbedding: undefined,
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+    hasNext: false,
+    hasPrev: false
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filters, setFilters] = useState<QuestionFilterParams>({});
   const [sort, setSort] = useState<QuestionSortParams>({
     sortBy: 'created_at',
-    sortOrder: 'desc',
+    sortOrder: 'desc'
   });
-
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectAllOnPage, setSelectAllOnPage] = useState(false);
-
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
+  const [progress, setProgress] = useState<QuestionGenerationProgress | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const pageSize = initialPageSize;
-
-  const fetchQuestions = useCallback(async (page: number = currentPage) => {
+  // Soru listesini getirme fonksiyonu
+  const fetchQuestions = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await questionsApi.getQuestions({
-        page,
-        limit: pageSize,
         ...filters,
-        ...sort,
+        page: currentPage,
+        limit: pageSize,
+        ...sort
       });
-      setQuestions(response.data || []);
-      setPagination(response.pagination || null);
-      setCurrentPage(page); // Sayfa başarıyla yüklendiğinde currentPage'i güncelle
-      setSelectedIds(new Set()); // Her fetch sonrası sayfa seçimi sıfırlansın
-      setSelectAllOnPage(false);
-    } catch (err: any) {
-      console.error('Soru yükleme hatası (hook):', err);
-      setError(err.message || 'Sorular yüklenirken bir hata oluştu.');
-      setQuestions([]);
-      setPagination(null);
+      setQuestions(response.data);
+      setPagination(response.pagination);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sorular yüklenirken bir hata oluştu');
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, pageSize, filters, sort]);
+  }, [filters, currentPage, pageSize, sort]);
 
-  useEffect(() => {
-    fetchQuestions(1); // Filtreler veya sıralama değiştiğinde ilk sayfayı yükle
-  }, [filters, sort]); // fetchQuestions'ı bağımlılıktan çıkardık, çünkü o zaten currentPage'e bağlı
+  // Filtreleme işlemi
+  const handleFilterChange = (newFilters: QuestionFilterParams) => {
+    setFilters(prevFilters => ({
+      ...prevFilters,
+      ...newFilters
+    }));
+    setCurrentPage(1);
+  };
 
+  // Sıralama işlemi
+  const handleSortChange = (newSort: QuestionSortParams) => {
+    setSort(newSort);
+  };
 
-  const handleFilterChange = useCallback(<K extends keyof QuestionFilterParams>(
-    filterName: K,
-    value: QuestionFilterParams[K]
-  ) => {
-    setFilters(prev => ({ ...prev, [filterName]: value }));
-    // setCurrentPage(1) useEffect'te filters değişince fetchQuestions(1)'i tetikleyecek
-  }, []);
+  // Sayfa değiştirme
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
 
-  const handleSortChange = useCallback((newSort: Partial<QuestionSortParams>) => {
-    setSort(prev => ({ ...prev, ...newSort }));
-    // setCurrentPage(1) useEffect'te sort değişince fetchQuestions(1)'i tetikleyecek
-  }, []);
-
-  const handlePageChange = useCallback((newPage: number) => {
-    if (newPage > 0 && (!pagination || newPage <= pagination.totalPages)) {
-        fetchQuestions(newPage);
-    }
-  }, [fetchQuestions, pagination]);
-
-
-  const toggleSelectQuestion = useCallback((questionId: string) => {
+  // Soru seçme işlemleri
+  const toggleSelectQuestion = (questionId: string) => {
     setSelectedIds(prev => {
-      const newSelectedIds = new Set(prev);
-      if (newSelectedIds.has(questionId)) {
-        newSelectedIds.delete(questionId);
+      const newSet = new Set(prev);
+      if (newSet.has(questionId)) {
+        newSet.delete(questionId);
       } else {
-        newSelectedIds.add(questionId);
+        newSet.add(questionId);
       }
-      return newSelectedIds;
+      return newSet;
     });
-    setSelectAllOnPage(false); // Tekil seçim "tümünü seç"i bozar
-  }, []);
+  };
 
-  const toggleSelectAllOnPage = useCallback(() => {
+  // Toplu seçim işlemleri
+  const toggleSelectAllOnPage = () => {
     if (selectAllOnPage) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(questions.map(q => q.id)));
+      const pageIds = questions.map(q => q.id);
+      setSelectedIds(new Set(pageIds));
     }
-    setSelectAllOnPage(prev => !prev);
-  }, [questions, selectAllOnPage]);
+    setSelectAllOnPage(!selectAllOnPage);
+  };
 
-
-  const handleEdit = useCallback((question: Question) => {
-    setEditingQuestion(question);
-    setShowEditModal(true);
-  }, []);
-
-  const handleCloseEditModal = useCallback(() => {
-    setShowEditModal(false);
-    setEditingQuestion(null);
-  }, []);
-
-  const handleUpdate = useCallback(async (updatedQuestion: Question): Promise<boolean> => {
-    if (!editingQuestion) return false;
-    setIsLoading(true); // Veya spesifik bir 'isUpdating' state'i
+  // Soru güncelleme işlemi
+  const handleUpdateQuestion = async (questionId: string, updates: Partial<Question>) => {
     try {
-      await questionsApi.updateQuestion(editingQuestion.id, updatedQuestion);
-      setShowEditModal(false);
-      setEditingQuestion(null);
-      fetchQuestions(currentPage); // Güncel listeyi çek
-      return true;
-    } catch (err: any) {
-      console.error('Soru güncelleme hatası:', err);
-      setError(err.message || 'Soru güncellenirken bir hata oluştu.');
-      // Form içinde hata gösterimi için bu hatayı yakalayıp göstermek daha iyi olabilir.
-      return false;
-    } finally {
-      setIsLoading(false);
+      await questionsApi.updateQuestion(questionId, updates);
+      await fetchQuestions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Soru güncellenirken bir hata oluştu');
     }
-  }, [editingQuestion, currentPage, fetchQuestions]);
+  };
 
-
-  const handleDelete = useCallback((question: Question) => {
-    setQuestionToDelete(question);
-    setShowDeleteModal(true);
-  }, []);
-
-  const handleCloseDeleteModal = useCallback(() => {
-    setShowDeleteModal(false);
-    setQuestionToDelete(null);
-  }, []);
-
-  const handleConfirmDelete = useCallback(async () => {
-    if (!questionToDelete) return;
-    setIsLoading(true); // Veya spesifik bir 'isDeleting' state'i
+  // Soru silme işlemi
+  const handleDeleteQuestion = async (questionId: string) => {
     try {
-      await questionsApi.deleteQuestion(questionToDelete.id);
-      setShowDeleteModal(false);
-      setQuestionToDelete(null);
-      fetchQuestions(currentPage); // Güncel listeyi çek
-      setSelectedIds(prev => { // Silinen soruyu seçimden çıkar
-          const newSelected = new Set(prev);
-          newSelected.delete(questionToDelete.id);
-          return newSelected;
+      await questionsApi.deleteQuestion(questionId);
+      await fetchQuestions();
+      setSelectedIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(questionId);
+        return newSet;
       });
-    } catch (err: any) {
-      console.error('Soru silme hatası:', err);
-      setError(err.message || 'Soru silinirken bir hata oluştu.');
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Soru silinirken bir hata oluştu');
     }
-  }, [questionToDelete, currentPage, fetchQuestions]);
+  };
 
-  const handleBulkDelete = useCallback(async (): Promise<BulkActionResponse | undefined> => {
-    if (selectedIds.size === 0) {
-      alert('Lütfen silmek için en az bir soru seçin.');
-      return;
-    }
-    if (!window.confirm(`${selectedIds.size} soruyu kalıcı olarak silmek istediğinizden emin misiniz?`)) {
-        return;
-    }
-    setIsLoading(true);
+  // Toplu soru silme işlemi
+  const handleBulkDelete = async () => {
     try {
-      const response = await questionsApi.bulkDeleteQuestions(Array.from(selectedIds));
-      fetchQuestions(1); // Toplu silme sonrası ilk sayfaya dön ve listeyi yenile
+      await questionsApi.bulkDeleteQuestions(Array.from(selectedIds));
       setSelectedIds(new Set());
-      setSelectAllOnPage(false);
-      alert(`${response.deletedCount} soru başarıyla silindi. ${response.failedCount > 0 ? `${response.failedCount} soru silinemedi.` : ''}`);
-      return response;
-    } catch (err: any) {
-      console.error('Toplu soru silme hatası:', err);
-      setError(err.message || 'Toplu silme işlemi sırasında bir hata oluştu.');
-    } finally {
-      setIsLoading(false);
+      await fetchQuestions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sorular silinirken bir hata oluştu');
     }
-  }, [selectedIds, fetchQuestions]);
-  
-  // Diğer toplu işlemler (örn: re-generate, change difficulty) buraya eklenebilir.
+  };
+
+  // Soru üretme işlemi
+  const generateQuestions = async (wordIds: number[]) => {
+    setIsGenerating(true);
+    setProgress({
+      current: 0,
+      total: wordIds.length,
+      percentage: 0,
+      stage: 'starting',
+      message: 'Soru üretimi başlatılıyor...',
+      successful: 0,
+      failed: 0,
+      timeElapsed: 0
+    });
+
+    try {
+      const generationResult = await questionsApi.generateQuestions({
+        wordIds: wordIds,
+        maxConcurrent: 5,
+        validateQuality: true
+      });
+
+      setProgress(prev => prev ? {
+        ...prev,
+        stage: 'complete',
+        message: `${generationResult.results.successCount} soru başarıyla üretildi.`,
+        successful: generationResult.results.successCount,
+        failed: generationResult.results.failureCount
+      } : null);
+
+      await fetchQuestions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Soru üretimi sırasında bir hata oluştu');
+      setProgress(prev => prev ? {
+        ...prev,
+        stage: 'error',
+        message: 'Soru üretimi sırasında bir hata oluştu'
+      } : null);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Yenileme ve temizleme işlemleri
+  useEffect(() => {
+    fetchQuestions();
+  }, [fetchQuestions, refreshKey]);
+
+  useEffect(() => {
+    return () => {
+      setProgress(null);
+      setIsGenerating(false);
+    };
+  }, []);
 
   return {
     questions,
@@ -223,19 +210,24 @@ export const useQuestionManagementLogic = ({
     questionToDelete,
     showDeleteModal,
     pageSize,
+    progress,
+    isGenerating,
 
-    fetchQuestions: () => fetchQuestions(currentPage), // Mevcut sayfayı yenile
+    fetchQuestions,
     handleFilterChange,
     handleSortChange,
     handlePageChange,
     toggleSelectQuestion,
     toggleSelectAllOnPage,
-    handleEdit,
-    handleCloseEditModal,
-    handleUpdate,
-    handleDelete,
-    handleCloseDeleteModal,
-    handleConfirmDelete,
+    handleUpdateQuestion,
+    handleDeleteQuestion,
     handleBulkDelete,
+    generateQuestions,
+    
+    setEditingQuestion,
+    setShowEditModal,
+    setQuestionToDelete,
+    setShowDeleteModal,
+    setPageSize
   };
 };
