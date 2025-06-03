@@ -118,9 +118,11 @@ app.post('/api/processor/start', async (req, res) => {
     }
 
     // Async olarak başlat (background'da çalışsın)
-    wordProcessor.startProcessing().catch(error => {
-      console.error('❌ Background processing hatası:', error);
-    });
+   console.log('⚙️ Word processor starting...'); // Added log
+   wordProcessor.startProcessing().catch(error => {
+     console.error('❌ Background processing hatası:', error);
+   });
+   console.log('✅ Word processor started'); // Added log
 
     res.json({
       message: 'Word processor başlatıldı',
@@ -138,6 +140,7 @@ app.post('/api/processor/start', async (req, res) => {
 
 app.post('/api/processor/stop', (req, res) => {
   try {
+    console.log('⚙️ Word processor stopping...'); // Added log
     wordProcessor.stopProcessing();
     res.json({
       message: 'Word processor durduruluyor',
@@ -193,36 +196,47 @@ app.use('*', (req, res) => {
 });
 
 // Error handler
-app.use((error, req, res, next) => {
+function errorHandler(error, req, res, next) {
   console.error('❌ Server Error:', error);
-  
-  // Supabase errors
+
+  let statusCode = error.statusCode || 500;
+  let errorMessage = 'Sunucu hatası';
+
+  if (process.env.NODE_ENV === 'development') {
+    errorMessage = error.message;
+  } else {
+    console.error('❌ Server Error:', error); // Log the error in production
+  }
+
+  // Specific error handling
   if (error.code === 'PGRST116') {
-    return res.status(404).json({
-      error: 'Veritabanı tablosu bulunamadı',
-      message: 'Lütfen Supabase dashboard\'dan "words" tablosunu oluşturun'
-    });
+    statusCode = 404;
+    errorMessage = 'Veritabanı tablosu bulunamadı. Lütfen Supabase dashboard\'dan "words" tablosunu oluşturun.';
+  } else if (error.code === 'ECONNABORTED') {
+    statusCode = 408;
+    errorMessage = 'İstek zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.';
   }
-  
-  // Network timeout
-  if (error.code === 'ECONNABORTED') {
-    return res.status(408).json({
-      error: 'İstek zaman aşımına uğradı',
-      message: 'Lütfen daha sonra tekrar deneyin'
-    });
-  }
-  
-  // Generic error
-  const statusCode = error.statusCode || 500;
-  const message = process.env.NODE_ENV === 'development' 
-    ? error.message 
-    : 'Sunucu hatası oluştu';
-    
+
   res.status(statusCode).json({
     error: 'Sunucu hatası',
-    message
+    message: errorMessage
   });
-});
+}
+
+app.use(errorHandler);
+
+function validateEnvVariables() {
+  const requiredEnvVariables = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'FRONTEND_URL'];
+
+  requiredEnvVariables.forEach(function(variable) {
+    if (!process.env[variable]) {
+      console.error(`❌ ${variable} environment variable is required`);
+      process.exit(1);
+    }
+  });
+}
+
+validateEnvVariables();
 
 // Server'ı başlat
 const server = app.listen(PORT, '0.0.0.0', () => {
@@ -231,35 +245,45 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`📊 Supabase URL: ${supabaseUrl}`);
   console.log(`🤖 AI Model: Gemini 2.0 Flash`);
   console.log(`⏰ Başlatma zamanı: ${new Date().toISOString()}`);
-  
+  console.log('✅ Server started successfully'); // Added log
+
   // 5 saniye sonra word processor'ı başlat
   setTimeout(() => {
-    console.log('🔍 Pending words kontrol ediliyor...');
-    supabase
-      .from('pending_words')
-      .select('*', { count: 'exact', head: true })
-      .then(({ count, error }) => {
-        if (error) {
-          console.error('❌ Pending words kontrol hatası:', error);
-          return;
-        }
-        
-        if (count && count > 0) {
-          console.log(`📋 ${count} kelime pending, processor başlatılıyor...`);
-          wordProcessor.startProcessing().catch(error => {
-            console.error('❌ Auto-start processing hatası:', error);
-          });
-        } else {
-          console.log('✅ Pending words yok, processor bekleme modunda');
-        }
-      });
+    checkPendingWords(supabase, wordProcessor);
   }, 5000);
 });
+
+async function checkPendingWords(supabase, wordProcessor) {
+  console.log('🔍 Pending words kontrol ediliyor...');
+  try {
+    const { count, error } = await supabase
+      .from('pending_words')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      console.error('❌ Pending words kontrol hatası:', error);
+      return;
+    }
+
+    if (count && count > 0) {
+      console.log(`📋 ${count} kelime pending, processor başlatılıyor...`);
+      wordProcessor.startProcessing().catch(error => {
+        console.error('❌ Auto-start processing hatası:', error);
+      });
+    } else {
+      console.log('✅ Pending words yok, processor bekleme modunda');
+    }
+    console.log('✅ Pending words check completed'); // Added log
+  } catch (error) {
+    console.error('❌ Pending words kontrol hatası:', error);
+  }
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM signal alındı, sunucu kapatılıyor...');
   wordProcessor.stopProcessing();
+  console.log('✅ Word processor stopped'); // Added log
   server.close(() => {
     console.log('✅ HTTP server kapatıldı');
     process.exit(0);
@@ -269,6 +293,7 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('🛑 SIGINT signal alındı, sunucu kapatılıyor...');
   wordProcessor.stopProcessing();
+  console.log('✅ Word processor stopped'); // Added log
   server.close(() => {
     console.log('✅ HTTP server kapatıldı');
     process.exit(0);

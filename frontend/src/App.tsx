@@ -4,6 +4,7 @@ import FileUpload from './components/FileUpload';
 import QueueStatus from './components/QueueStatus';
 import { BulkAddResponse, FileUploadResponse } from './types';
 import { wordApi } from './services/api';
+import styles from './App.module.css';
 import './App.css';
 
 type TabType = 'file' | 'manual' | 'queue';
@@ -31,6 +32,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabType>('file');
   const [lastBatchId, setLastBatchId] = useState<string | undefined>();
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [systemInfoError, setSystemInfoError] = useState<string | null>(null);
 
   // Tab configurations
   const tabs: TabConfig[] = [
@@ -60,8 +62,10 @@ function App() {
       try {
         const info = await wordApi.getSystemInfo();
         setSystemInfo(info);
-      } catch (error) {
+        setSystemInfoError(null);
+      } catch (error: any) {
         console.error('System info alınamadı:', error);
+        setSystemInfoError(error.message || 'Bilinmeyen bir hata oluştu');
       }
     };
 
@@ -119,64 +123,34 @@ function App() {
 
   return (
     <div className="App">
-      {/* Header */}
-      <header style={{ 
-        backgroundColor: '#282c34', 
-        padding: '20px', 
-        color: 'white', 
-        textAlign: 'center',
-        marginBottom: '0'
-      }}>
-        <h1 style={{ margin: '0 0 10px 0' }}>🧙‍♂️ Word Wizard</h1>
-        <p style={{ margin: '0', opacity: 0.8 }}>
-          İngilizce Kelime Veritabanı Yöneticisi - {systemInfo?.aiModel || 'Gemini 2.0 Flash'} AI Destekli
-        </p>
-        {systemInfo && (
-          <div style={{ marginTop: '8px' }}>
-            <span style={{
-              backgroundColor: '#007bff',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '12px',
-              fontSize: '12px',
-              fontWeight: 'bold'
-            }}>
-              v{systemInfo.version} | {systemInfo.environment}
-            </span>
-          </div>
-        )}
-      </header>
+        {/* Header */}
+        <header className={styles.AppHeader}>
+          <h1>🧙‍♂️ Word Wizard</h1>
+          <p>
+            İngilizce Kelime Veritabanı Yöneticisi - {systemInfo?.aiModel || 'Gemini 2.0 Flash'} AI Destekli
+          </p>
+          {systemInfo && (
+            <div>
+              <span className={styles.VersionBadge}>
+                v{systemInfo.version} | {systemInfo.environment}
+              </span>
+            </div>
+          )}
+          {systemInfoError && (
+            <div className={styles.SystemInfoError}>
+              Hata: {systemInfoError}
+            </div>
+          )}
+        </header>
 
       {/* Tab Navigation */}
-      <div style={{ 
-        backgroundColor: '#f8f9fa',
-        borderBottom: '1px solid #dee2e6',
-        padding: '0'
-      }}>
-        <div style={{ 
-          maxWidth: '1000px', 
-          margin: '0 auto',
-          display: 'flex',
-          overflow: 'auto'
-        }}>
+      <div className={styles.TabNavigation}>
+        <div className={styles.TabNavigationContainer}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              style={{
-                flex: '1',
-                minWidth: '200px',
-                padding: '20px 15px',
-                border: 'none',
-                backgroundColor: activeTab === tab.id ? '#ffffff' : 'transparent',
-                color: activeTab === tab.id ? '#495057' : '#6c757d',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: activeTab === tab.id ? 'bold' : 'normal',
-                borderBottom: activeTab === tab.id ? '3px solid #007bff' : '3px solid transparent',
-                transition: 'all 0.3s ease',
-                textAlign: 'center'
-              }}
+              className={`${styles.TabButton} ${activeTab === tab.id ? styles.TabButtonActive : ''}`}
               onMouseEnter={(e) => {
                 if (activeTab !== tab.id) {
                   e.currentTarget.style.backgroundColor = '#e9ecef';
@@ -188,17 +162,13 @@ function App() {
                 }
               }}
             >
-              <div style={{ fontSize: '24px', marginBottom: '5px' }}>
+              <div className={styles.TabIcon}>
                 {tab.icon}
               </div>
-              <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>
+              <div className={styles.TabLabel}>
                 {tab.label}
               </div>
-              <div style={{ 
-                fontSize: '12px', 
-                opacity: 0.7,
-                lineHeight: '1.3'
-              }}>
+              <div className={styles.TabDescription}>
                 {tab.description}
               </div>
             </button>
@@ -207,83 +177,62 @@ function App() {
       </div>
 
       {/* Tab Content */}
-      <main style={{ 
-        minHeight: 'calc(100vh - 200px)',
-        backgroundColor: '#ffffff'
-      }}>
+      <main className={styles.AppMain}>
         {renderTabContent()}
       </main>
 
       {/* Footer */}
-      <footer style={{ 
-        backgroundColor: '#f8f9fa',
-        textAlign: 'center', 
-        padding: '30px 20px', 
-        color: '#6c757d',
-        borderTop: '1px solid #dee2e6'
-      }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-            gap: '20px',
-            marginBottom: '20px'
-          }}>
+      <footer className={styles.AppFooter}>
+        <div className={styles.FooterContainer}>
+          <div className={styles.TechnicalInfo}>
             <div>
-              <h4 style={{ color: '#495057', marginBottom: '10px' }}>🔧 Teknik Bilgiler</h4>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
+              <h4>🔧 Teknik Bilgiler</h4>
+              <p>
                 <strong>Backend:</strong> {process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}
               </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
+              <p>
                 <strong>Veritabanı:</strong> {systemInfo?.database || 'Supabase PostgreSQL'}
               </p>
-              <p style={{ margin: '5px 0', fontSize: '14px' }}>
+              <p>
                 <strong>AI Engine:</strong> {systemInfo?.aiModel || 'Gemini 2.0 Flash API'}
               </p>
             </div>
-
             <div>
-              <h4 style={{ color: '#495057', marginBottom: '10px' }}>⚡ Aşamalı Analiz Özellikleri</h4>
+              <h4>⚡ Aşamalı Analiz Özellikleri</h4>
               {systemInfo?.features ? (
                 systemInfo.features.slice(0, 4).map((feature, index) => (
-                  <p key={index} style={{ margin: '5px 0', fontSize: '14px' }}>
+                  <p key={index}>
                     ✅ {feature}
                   </p>
                 ))
               ) : (
                 <>
-                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                  <p>
                     ✅ 6 aşamalı kelime analizi
                   </p>
-                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                  <p>
                     ✅ Çoklu anlam desteği
                   </p>
-                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                  <p>
                     ✅ Akıllı zorluk analizi
                   </p>
-                  <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                  <p>
                     ✅ Context-aware çeviri
                   </p>
                 </>
               )}
             </div>
           </div>
-
-          <div style={{ 
-            borderTop: '1px solid #dee2e6', 
-            paddingTop: '15px',
-            fontSize: '12px'
-          }}>
-            <p style={{ margin: '0' }}>
-              🤖 Powered by <strong>Gemini 2.0 Flash</strong> | 
-              🗄️ <strong>Supabase</strong> | 
-              ⚛️ <strong>React + TypeScript</strong> | 
+          <div className={styles.FooterBorderTop}>
+            <p>
+              🤖 Powered by <strong>Gemini 2.0 Flash</strong> |
+              🗄️ <strong>Supabase</strong> |
+              ⚛️ <strong>React + TypeScript</strong> |
               🎯 <strong>6-Step Analysis System</strong>
             </p>
-            
             {systemInfo && (
-              <p style={{ margin: '5px 0 0 0', opacity: 0.8 }}>
-                Son güncelleme: {new Date(systemInfo.lastUpdated).toLocaleDateString('tr-TR')} | 
+              <p>
+                Son güncelleme: {new Date(systemInfo.lastUpdated).toLocaleDateString('tr-TR')} |
                 Çevre: {systemInfo.environment}
               </p>
             )}
