@@ -1,4 +1,15 @@
 // frontend/src/types/questions.ts
+export interface WordForGeneration {
+  id: number;
+  word: string;
+  meaning_id: number;
+  part_of_speech: string;
+  meaning_description: string;
+  english_example: string;
+  turkish_meaning: string;
+  final_difficulty: string;
+}
+
 export interface Question {
   id: string;
   word_id: number;
@@ -35,18 +46,43 @@ export interface QuestionGenerationConfig {
   validateQuality?: boolean;
 }
 
-export interface QuestionGenerationResult {
+export interface QuestionGenerationComponentProps {
+  selectedWords: WordForGeneration[];
+  onQuestionsGenerated: (count: number) => void;
+  onBackToSelection: () => void;
+}
+
+export interface QuestionGenerationProgress {
+  current: number;
+  total: number;
+  percentage: number;
+  stage: 'starting' | 'generating' | 'saving' | 'complete' | 'error';
+  message: string;
+  successful: number;
+  failed: number;
+  timeElapsed: number;
+  estimatedTimeRemaining?: number;
+}
+
+export interface GenerationResult {
   word: string;
   wordId: number;
   questionId: number;
   processingTime?: number;
 }
 
+export interface GenerationFailure {
+  word: string;
+  wordId: number;
+  reason: string;
+  error?: string;
+}
+
 export interface QuestionGenerationResponse {
   message: string;
   results: {
-    successful: QuestionGenerationResult[];
-    failed: { wordId: number; reason: string }[];
+    successful: GenerationResult[];
+    failed: GenerationFailure[];
     successCount: number;
     failureCount: number;
     processingTime?: number;
@@ -73,18 +109,6 @@ export interface QuestionFilterParams {
 export interface QuestionSortParams {
   sortBy: string;
   sortOrder: 'asc' | 'desc';
-}
-
-export interface QuestionGenerationProgress {
-  current: number;
-  total: number;
-  percentage: number;
-  stage: 'starting' | 'generating' | 'saving' | 'complete' | 'error';
-  message: string;
-  successful: number;
-  failed: number;
-  timeElapsed: number;
-  estimatedTimeRemaining?: number;
 }
 
 export interface BulkActionResponse {
