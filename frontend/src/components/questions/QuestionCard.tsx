@@ -7,10 +7,10 @@ import { Question } from '../../types/questions';
 interface QuestionCardProps {
   question: Question;
   isSelected: boolean;
-  onSelect: (questionId: number) => void;
-  onToggleActive: (questionId: number) => void;
-  onDelete: (questionId: number) => void;
-  isUpdating: boolean;
+  onSelect: (questionId: string) => void;
+  onToggleActive: (questionId: string) => void;
+  onDelete: (questionId: string) => void;
+  isUpdating?: boolean;
 }
 
 const QuestionCard: React.FC<QuestionCardProps> = ({
@@ -19,10 +19,10 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   onSelect,
   onToggleActive,
   onDelete,
-  isUpdating
+  isUpdating = false
 }) => {
   const getDifficultyColor = (difficulty: string): string => {
-    switch (difficulty) {
+    switch (difficulty.toLowerCase()) {
       case 'beginner': return '#28a745';
       case 'intermediate': return '#ffc107';
       case 'advanced': return '#dc3545';
@@ -30,7 +30,23 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
     }
   };
 
-  const word = question.word;
+  const { word } = question;
+
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('tr-TR');
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const options = [
+    { key: 'A', text: question.option_a },
+    { key: 'B', text: question.option_b },
+    { key: 'C', text: question.option_c },
+    { key: 'D', text: question.option_d }
+  ];
 
   return (
     <Card isSelected={isSelected}>
@@ -48,6 +64,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
               checked={isSelected}
               onChange={() => onSelect(question.id)}
               style={{ marginRight: '10px', transform: 'scale(1.2)' }}
+              aria-label="Soruyu seç"
             />
             
             <h4 style={{ margin: '0', color: '#2c3e50', fontSize: '16px' }}>
@@ -100,6 +117,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             disabled={isUpdating}
             variant={question.is_active ? 'warning' : 'success'}
             size="small"
+            aria-label={question.is_active ? 'Soruyu pasif yap' : 'Soruyu aktif yap'}
           >
             {question.is_active ? '⏸️ Pasif Yap' : '▶️ Aktif Yap'}
           </Button>
@@ -109,6 +127,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             disabled={isUpdating}
             variant="danger"
             size="small"
+            aria-label="Soruyu sil"
           >
             🗑️ Sil
           </Button>
@@ -135,12 +154,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
           gap: '8px'
         }}>
-          {[
-            { key: 'A', text: question.option_a },
-            { key: 'B', text: question.option_b },
-            { key: 'C', text: question.option_c },
-            { key: 'D', text: question.option_d }
-          ].map(option => (
+          {options.map(option => (
             <div
               key={option.key}
               style={{
@@ -171,24 +185,26 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           Açıklama:
         </div>
         <div style={{ fontSize: '13px', color: '#495057' }}>
-          {question.explanation}
+          {question.explanation || 'Açıklama bulunmuyor.'}
         </div>
       </div>
 
       {/* Context Paragraph */}
-      <div style={{
-        backgroundColor: '#fff3cd',
-        padding: '10px',
-        borderRadius: '4px',
-        marginBottom: '10px'
-      }}>
-        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
-          Bağlam Cümlesi:
+      {question.paragraph && (
+        <div style={{
+          backgroundColor: '#fff3cd',
+          padding: '10px',
+          borderRadius: '4px',
+          marginBottom: '10px'
+        }}>
+          <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
+            Bağlam Cümlesi:
+          </div>
+          <div style={{ fontSize: '13px', color: '#495057', fontStyle: 'italic' }}>
+            "{question.paragraph}"
+          </div>
         </div>
-        <div style={{ fontSize: '13px', color: '#495057', fontStyle: 'italic' }}>
-          "{question.paragraph}"
-        </div>
-      </div>
+      )}
 
       {/* Statistics */}
       <div style={{ 
@@ -204,9 +220,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           <strong>Türkçe Karşılık:</strong> {word?.turkish_meaning || 'N/A'}
         </div>
         <div>
-          <strong>Gösterilme:</strong> {question.times_shown} | 
-          <strong>Doğru:</strong> {question.times_correct} | 
-          <strong>Oluşturulma:</strong> {new Date(question.created_at).toLocaleDateString('tr-TR')}
+          <strong>Gösterilme:</strong> {question.times_shown || 0} | 
+          <strong>Doğru:</strong> {question.times_correct || 0} | 
+          <strong>Oluşturulma:</strong> {formatDate(question.created_at)}
         </div>
       </div>
     </Card>
