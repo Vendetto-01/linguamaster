@@ -16,7 +16,7 @@ const generationConfig = {
   temperature: 0.7,
   topK: 1,
   topP: 1,
-  maxOutputTokens: 2048,
+  maxOutputTokens: 2048, // Increased slightly in case of many definitions with unique examples
   responseMimeType: "application/json",
 };
 
@@ -27,18 +27,24 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-interface GeminiWordResponse {
+// Details for each definition
+interface GeminiDefinitionDetail {
+  definition_text: string;
   part_of_speech: string;
-  definitions: string[]; // Changed from 'definition: string' to 'definitions: string[]'
-  difficulty_level: string;
+  difficulty_level: string; 
   example_sentence: string;
-  option_a: string;
+}
+
+// Updated main response structure from Gemini
+interface GeminiWordResponse {
+  definitions: GeminiDefinitionDetail[]; // Array of detailed definition objects
+  // Quiz options remain top-level as they apply to the word overall
+  option_a: string; // This should be one of the definition_text values
   option_b: string;
   option_c: string;
   option_d: string;
 }
 
-// The service will now return an array of WordEntry objects
 export const addWordService = async (wordSubmission: { word: string }): Promise<WordEntry[]> => {
   const { word } = wordSubmission;
 
@@ -46,19 +52,20 @@ export const addWordService = async (wordSubmission: { word: string }): Promise<
 
   const prompt = `
     For the English vocabulary word "${word}", provide the following information in JSON format:
-    1.  "part_of_speech": The part of speech (e.g., noun, verb, adjective).
-    2.  "definitions": An array of strings, where each string is a distinct dictionary-style definition. Do not use bullet points within the strings.
-    3.  "difficulty_level": The CEFR difficulty level (e.g., A1, A2, B1, B2, C1, C2).
-    4.  "example_sentence": An example sentence using the word that matches the difficulty level and part of speech. This sentence should ideally relate to one of the primary definitions.
-    5.  "option_a": The correct definition (choose one of the provided definitions) or a close synonym, suitable as a multiple-choice correct answer.
-    6.  "option_b": An incorrect multiple-choice option.
-    7.  "option_c": Another incorrect multiple-choice option.
-    8.  "option_d": A third incorrect multiple-choice option.
+    1.  "definitions": An array of objects. Each object must contain:
+        a.  "definition_text": A distinct dictionary-style definition for the word.
+        b.  "part_of_speech": The specific part of speech for this definition (e.g., noun, verb, adjective).
+        c.  "difficulty_level": The CEFR difficulty level for this definition (e.g., A1, A2, B1, B2, C1, C2).
+        d.  "example_sentence": A unique example sentence using the word that specifically matches this definition_text, part_of_speech, and difficulty_level.
+    2.  "option_a": The text of one of the "definition_text" values provided above, suitable as a multiple-choice correct answer.
+    3.  "option_b": An incorrect multiple-choice option (a plausible but wrong definition or synonym).
+    4.  "option_c": Another incorrect multiple-choice option.
+    5.  "option_d": A third incorrect multiple-choice option.
 
-    Ensure the example sentence is appropriate for the given difficulty level.
-    The question for these options will be: "What is the meaning of the word '${word}' used in the following sentence?"
+    The question for these options will be: "What is the meaning of the word '${word}' used in the following sentence?" 
+    (The frontend will dynamically generate the sentence part of the question using one of the example_sentence values).
     
-    Output ONLY the JSON object.
+    Output ONLY the JSON object. Ensure each "example_sentence" is unique and relevant to its corresponding "definition_text".
   `;
 
   try {
@@ -70,33 +77,41 @@ export const addWordService = async (wordSubmission: { word: string }): Promise<
     const responseText = result.response.text();
     const geminiData = JSON.parse(responseText) as GeminiWordResponse;
 
-    const requiredKeys: Array<keyof GeminiWordResponse> = ['part_of_speech', 'definitions', 'difficulty_level', 'example_sentence', 'option_a', 'option_b', 'option_c', 'option_d'];
-    for (const key of requiredKeys) {
-        if (!(key in geminiData) || geminiData[key] === undefined) { // Allow empty string for some fields if Gemini might return that
-            throw new Error(`Gemini API response missing required field: ${key}`);
+    // Validate top-level quiz options
+    const requiredQuizKeys: Array<keyof Pick<GeminiWordResponse, 'option_a' | 'option_b' | 'option_c' | 'option_d'>> = ['option_a', 'option_b', 'option_c', 'option_d'];
+    for (const key of requiredQuizKeys) {
+        if (!(key in geminiData) || typeof geminiData[key] !== 'string' || geminiData[key].trim() === '') {
+            throw new Error(`Gemini API response missing or has empty required quiz option field: ${key}`);
         }
     }
+
     if (!Array.isArray(geminiData.definitions) || geminiData.definitions.length === 0) {
-        throw new Error('Gemini API response "definitions" must be a non-empty array.');
+        throw new Error('Gemini API response "definitions" must be a non-empty array of objects.');
     }
     
     const wordEntriesToInsert: Omit<WordEntry, 'id' | 'created_at' | 'updated_at'>[] = [];
 
-    for (const singleDefinition of geminiData.definitions) {
-      if (typeof singleDefinition !== 'string' || singleDefinition.trim() === '') {
-        console.warn(`Skipping empty or invalid definition for word "${word}"`);
-        continue;
+    for (const detail of geminiData.definitions) {
+      // Validate each definition detail object
+      const requiredDetailKeys: Array<keyof GeminiDefinitionDetail> = ['definition_text', 'part_of_speech', 'difficulty_level', 'example_sentence'];
+      for (const key of requiredDetailKeys) {
+        if (!(key in detail) || typeof detail[key] !== 'string' || detail[key].trim() === '') {
+          console.warn(`Skipping a definition for word "${word}" due to missing or empty field: ${key} in`, detail);
+          continue; // Skip this definition object
+        }
       }
+
       wordEntriesToInsert.push({
         word: word,
-        part_of_speech: geminiData.part_of_speech,
-        definition: singleDefinition.trim(), // Use the individual definition here
-        difficulty_level: geminiData.difficulty_level,
-        example_sentence: geminiData.example_sentence, // Example sentence will be the same for all definitions of this word
-        option_a: geminiData.option_a, // Options will be the same
-        option_b: geminiData.option_b,
-        option_c: geminiData.option_c,
-        option_d: geminiData.option_d,
+        part_of_speech: detail.part_of_speech.trim(),
+        definition: detail.definition_text.trim(),
+        difficulty_level: detail.difficulty_level.trim(),
+        example_sentence: detail.example_sentence.trim(),
+        // Quiz options are the same for all entries of this word submission
+        option_a: geminiData.option_a.trim(), 
+        option_b: geminiData.option_b.trim(),
+        option_c: geminiData.option_c.trim(),
+        option_d: geminiData.option_d.trim(),
         update_note: null,
         placeholder_1: null,
         placeholder_2: null,
@@ -104,14 +119,13 @@ export const addWordService = async (wordSubmission: { word: string }): Promise<
     }
 
     if (wordEntriesToInsert.length === 0) {
-      throw new Error(`No valid definitions found for word "${word}" after processing Gemini response.`);
+      throw new Error(`No valid definitions found for word "${word}" after processing Gemini response. Check Gemini output structure and content.`);
     }
 
-    // 2. Save to Supabase
     const { data, error: supabaseError } = await supabase
       .from('words')
-      .insert(wordEntriesToInsert) // Insert an array of records
-      .select(); // Select all inserted records
+      .insert(wordEntriesToInsert)
+      .select();
 
     if (supabaseError) {
       console.error('Error inserting word entries into Supabase:', supabaseError);
@@ -123,11 +137,15 @@ export const addWordService = async (wordSubmission: { word: string }): Promise<
     }
 
     console.log(`${data.length} word entries saved to Supabase for "${word}":`, data);
-    return data as WordEntry[]; // Return array of WordEntry
+    return data as WordEntry[];
 
   } catch (error) {
     console.error(`Error processing word "${word}":`, error);
     if (error instanceof Error) {
+        // Check if it's a JSON parsing error, which might indicate Gemini didn't return valid JSON
+        if (error.message.includes("JSON at position")) {
+             console.error("Gemini response was likely not valid JSON. Raw response text might be logged by Gemini client if enabled, or inspect 'responseText' variable if debugging.");
+        }
         throw new Error(`Failed to process word "${word}": ${error.message}`);
     }
     throw new Error(`An unknown error occurred while processing word "${word}".`);
