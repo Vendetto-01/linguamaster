@@ -55,11 +55,22 @@ Respond ONLY with a valid JSON object in this exact format:
       "english_word": "${word}",
       "turkish_equivalent": "the specific Turkish word(s) that correspond to the English word in this context"
     }
+  ],
+  "step7_questions": [
+    {
+      "meaning_id": 1,
+      "question_text": "Complete question here",
+      "option_a": "First option",
+      "option_b": "Second option",
+      "option_c": "Third option",
+      "option_d": "Fourth option",
+      "correct_answer": "A/B/C/D",
+      "explanation": "Why this answer is correct",
+      "difficulty": "beginner|intermediate|advanced"
+    }
   ]
 }
 
-Important rules for your response:
-- Ensure all meaning_id values are consistent across the arrays for related items.
 - Include ALL common meanings of the word (maximum 6 meanings).
 - Use standard part of speech terms.
 - Example sentences in "step3_examples" MUST BE a single, somewhat long, academically challenging sentence per meaning.
@@ -67,33 +78,7 @@ Important rules for your response:
 - Word mappings should be precise.
 - Ensure the entire response is a single, valid JSON object.`;
 
-const QUESTION_GENERATOR_PROMPT_TEMPLATE = (wordContext) => `Create a multiple choice question for the English word: "${wordContext.word}"
-
-Context: Use this example sentence: "${wordContext.english_example}"
-Turkish meaning: "${wordContext.turkish_meaning}"
-Part of speech: "${wordContext.part_of_speech}"
-Difficulty: "${wordContext.final_difficulty}"
-
-Requirements:
-- Question should test understanding of the word in context
-- 4 options (A, B, C, D) with only one correct answer
-- 3 distractors should be plausible but clearly wrong
-- Include a brief explanation for the correct answer
-- Match the difficulty level: ${wordContext.final_difficulty}
-
-Return ONLY a JSON object with this exact structure:
-{
-  "question_text": "Complete question here",
-  "option_a": "First option",
-  "option_b": "Second option", 
-  "option_c": "Third option",
-  "option_d": "Fourth option",
-  "correct_answer": "A/B/C/D",
-  "explanation": "Why this answer is correct",
-  "difficulty": "${wordContext.final_difficulty}"
-}`;
-
 module.exports = {
-  WORD_PROCESSOR_PROMPT_TEMPLATE,
-  QUESTION_GENERATOR_PROMPT_TEMPLATE,
+  WORD_PROCESSOR_PROMPT_TEMPLATE: WORD_PROCESSOR_PROMPT_TEMPLATE,
+  QUESTION_GENERATOR_PROMPT_TEMPLATE: null,
 };
