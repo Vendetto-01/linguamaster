@@ -1,6 +1,6 @@
 // frontend/src/components/questions/WordSelectionFilter.tsx
 import React from 'react';
-import { WordFilters } from '../../types';
+import type { WordFilters } from '../../types';
 
 interface WordSelectionFilterProps {
   searchQuery: string;

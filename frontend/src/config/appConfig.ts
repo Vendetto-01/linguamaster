@@ -57,3 +57,5 @@ export const wordsTabs: WordsTabConfig[] = [
 export const APP_VERSION = '3.0 Admin';
 export const AI_MODEL_NAME = 'Gemini 2.0 Flash AI';
 export const DATABASE_PROVIDER = 'Supabase DB';
+
+export const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';

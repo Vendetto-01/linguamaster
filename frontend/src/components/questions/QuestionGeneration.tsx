@@ -3,13 +3,15 @@ import React, { useState, useCallback } from 'react';
 import Button from '../shared/Button';
 import Card from '../shared/Card';
 import ProgressDisplay from '../shared/ProgressDisplay';
-import ResultDisplay from '../shared/ResultDisplay';
-import { 
-  QuestionGenerationComponentProps, 
+// import ResultDisplay from '../shared/ResultDisplay'; // Commented out for now
+import type {
+  Word, // Added Word for selectedWords
+  Question, // Added Question for onQuestionsGenerated
+  QuestionGenerationComponentProps,
   QuestionGenerationProgress,
-  QuestionGenerationResponse 
-} from '../../types/questions';
-import { questionsApi } from '../../api/questionsApi';
+  GenerateQuestionsResponse as QuestionGenerationResponse // Aliased to match usage
+} from '../../types'; // Corrected path
+import { questionApi as questionsApi } from '../../services/api'; // Corrected path and aliased for consistency
 
 const QuestionGeneration: React.FC<QuestionGenerationComponentProps> = ({
   selectedWords,
@@ -44,21 +46,25 @@ const QuestionGeneration: React.FC<QuestionGenerationComponentProps> = ({
     const startTime = Date.now();
 
     try {
-      const generationResult = await questionsApi.generateQuestions({
-        wordIds: selectedWords.map(word => word.id),
-        maxConcurrent: 5,
-        validateQuality: true
-      });
+      const payload = {
+        word_ids: selectedWords.map(word => word.id),
+        generation_config: { // Moved extra params into generation_config
+          maxConcurrent: 5,
+          validateQuality: true
+        }
+      };
+      const generationResult: QuestionGenerationResponse = await questionsApi.generateQuestions(payload);
 
       setResult(generationResult);
-      onQuestionsGenerated(generationResult.results.successCount);
+      // Pass the actual questions array, or an empty array if undefined
+      onQuestionsGenerated(generationResult.questions || []);
 
       setProgress(prev => prev ? {
         ...prev,
         stage: 'complete',
-        message: `${generationResult.results.successCount} soru başarıyla üretildi.`,
-        successful: generationResult.results.successCount,
-        failed: generationResult.results.failureCount,
+        message: `${generationResult.generated_count} soru başarıyla üretildi.`, // Use generated_count
+        successful: generationResult.generated_count, // Use generated_count
+        failed: generationResult.failed_count, // Use failed_count
         timeElapsed: (Date.now() - startTime) / 1000,
         percentage: 100
       } : null);
@@ -121,7 +127,7 @@ const QuestionGeneration: React.FC<QuestionGenerationComponentProps> = ({
           </div>
         )}
 
-        {result && <ResultDisplay result={result} />}
+        {/* {result && <ResultDisplay result={result} />} */} {/* Commented out for now */}
 
         <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
           <Button

@@ -6,11 +6,20 @@ import type {
   FileUploadResponse,
   ProcessorStats,
   WordsResponse,
-  WordFilters
+  WordFilters,
+  // Question Types - YENİ EKLENDİ
+  Question,
+  QuestionStats as ApiQuestionStats, // Alias to avoid conflict if any local QuestionStats type exists
+  GenerateQuestionsPayload,
+  GenerateQuestionsResponse,
+  QuestionsResponse,
+  QuestionFilters as ApiQuestionFilters, // Alias
+  BulkQuestionsPayload,
+  BulkQuestionsResponse,
+  ToggleActiveResponse
 } from '../types';
 import { handleApiError } from '../utils/apiUtils';
-
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+import { API_BASE_URL } from '../config/appConfig';
 
 export const wordApi = {
   uploadFile: async (words: string[], fileName: string): Promise<FileUploadResponse> => {
@@ -90,4 +99,71 @@ export const wordApi = {
       return response.json();
     }
   }
+};
+
+export const questionApi = {
+  generateQuestions: async (payload: GenerateQuestionsPayload): Promise<GenerateQuestionsResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/questions/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) await handleApiError(response);
+    return response.json();
+  },
+
+  getQuestions: async (filters: ApiQuestionFilters = {}): Promise<QuestionsResponse> => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, String(value));
+      }
+    });
+    const response = await fetch(`${API_BASE_URL}/api/questions?${params.toString()}`);
+    if (!response.ok) await handleApiError(response);
+    return response.json();
+  },
+
+  getQuestionStats: async (): Promise<ApiQuestionStats> => {
+    const response = await fetch(`${API_BASE_URL}/api/questions/stats`);
+    if (!response.ok) await handleApiError(response);
+    return response.json();
+  },
+
+  updateQuestion: async (id: number, data: Partial<Question>): Promise<Question> => {
+    const response = await fetch(`${API_BASE_URL}/api/questions/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) await handleApiError(response);
+    return response.json();
+  },
+
+  deleteQuestion: async (id: number): Promise<{ message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/api/questions/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) await handleApiError(response);
+    return response.json();
+  },
+
+  bulkUpdateQuestions: async (payload: BulkQuestionsPayload): Promise<BulkQuestionsResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/questions/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) await handleApiError(response);
+    return response.json();
+  },
+
+  toggleQuestionActive: async (id: number): Promise<ToggleActiveResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/questions/${id}/toggle-active`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, // Ensure content type if backend expects it, even for empty body
+    });
+    if (!response.ok) await handleApiError(response);
+    return response.json();
+  },
 };

@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import WordSelection from './WordSelection';
 import QuestionGeneration from './QuestionGeneration';
 import QuestionManagement from './QuestionManagement';
-import type { Word } from '../../types'; // Word tipi WordSelection'dan gelebilir
-import type { QuestionsModuleTabId } from '../../types'; // Merkezi QuestionsModuleTabId import edildi
-import type { Question } from '../../types/questions'; // Question tipi questions.ts'den
+import type { Word, QuestionsModuleTabId, Question } from '../../types'; // Word tipi WordSelection'dan gelebilir
+// Merkezi QuestionsModuleTabId import edildi
+// Question tipi questions.ts'den - ARTIK MERKEZİ TİPTEN GELİYOR
 
 // QuestionsModuleProps arayüzü güncellendi
 interface QuestionsModuleProps {
@@ -92,6 +92,7 @@ const QuestionsModule: React.FC<QuestionsModuleProps> = ({
           <QuestionGeneration
             selectedWords={selectedWordsForGeneration}
             onQuestionsGenerated={handleQuestionsGenerated}
+            onBackToSelection={() => onTabChange('selection')}
           />
         );
       case 'management':

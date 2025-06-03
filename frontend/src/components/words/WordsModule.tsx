@@ -155,7 +155,7 @@ const WordsModule: React.FC = () => {
             <select
               id="wm-difficulty"
               value={difficultyFilter}
-              onChange={(e) => setDifficultyFilter(e.target.value as WordFilters['difficulty'])}
+              onChange={(e) => setDifficultyFilter(e.target.value as "" | "beginner" | "intermediate" | "advanced")}
               className="filterSelect"
             >
               <option value="">Tümü</option>
@@ -219,9 +219,6 @@ const WordsModule: React.FC = () => {
               currentPage={currentPage}
               totalPages={paginationInfo.totalPages}
               onPageChange={handlePageChange}
-              itemsPerPage={pageSize}
-              totalItems={paginationInfo.totalItems} // totalItems API'den geliyorsa
-              isLoading={isLoading}
             />
           )}
         </>

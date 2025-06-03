@@ -1,155 +1,132 @@
 // frontend/src/hooks/useQuestionManagementLogic.ts
 import { useState, useEffect, useCallback } from 'react';
-import { questionsApi } from '../api/questionsApi';
-import { 
-  Question,
-  QuestionFilterParams,
-  QuestionSortParams,
-  PaginationInfo,
-  QuestionGenerationProgress
-} from '../types/questions';
+import { questionApi } from '../services/api';
+import type { Question, QuestionsResponse, QuestionFilters } from '../types';
 
 interface UseQuestionManagementLogicProps {
   refreshKey?: number;
 }
 
 export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagementLogicProps) => {
-  // State tanımlamaları
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    currentPage: 1,
-    totalPages: 1,
-    totalItems: 0,
-    itemsPerPage: 10,
-    hasNext: false,
-    hasPrev: false
-  });
-  const [filters, setFilters] = useState<QuestionFilterParams>({});
-  const [sort, setSort] = useState<QuestionSortParams>({
-    sortBy: 'created_at',
-    sortOrder: 'desc'
-  });
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [pagination, setPagination] = useState<QuestionsResponse['pagination'] | null>(null);
+  const [filters, setFilters] = useState<QuestionFilters>({ page: 1, limit: 10 });
+  // Sort state can be part of filters if QuestionFilters includes sortBy and sortOrder
+  // const [sort, setSort] = useState<any>({}); // Define a proper sort type if needed
+
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectAllOnPage, setSelectAllOnPage] = useState(false);
+
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [pageSize] = useState(10);
-  const [progress, setProgress] = useState<QuestionGenerationProgress | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
 
-  // Soru listesini getirme fonksiyonu
-  const fetchQuestions = useCallback(async () => {
+  const fetchQuestions = useCallback(async (currentFilters?: QuestionFilters) => {
     setIsLoading(true);
-    setError(null);
+    setError('');
     try {
-      const response = await questionsApi.getQuestions({
-        ...filters,
-        page: pagination.currentPage,
-        limit: pageSize,
-        ...sort
-      });
-      setQuestions(response.data);
-      setPagination(response.pagination);
+      const queryFilters = currentFilters || filters;
+      const data = await questionApi.getQuestions(queryFilters);
+      setQuestions(data.questions || []);
+      setPagination(data.pagination || null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sorular yüklenirken bir hata oluştu');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch questions';
+      setError(errorMessage);
+      setQuestions([]);
+      setPagination(null);
     } finally {
       setIsLoading(false);
     }
-  }, [filters, pagination.currentPage, pageSize, sort]);
+  }, [filters]);
 
-  // Filtreleme işlemi
-  const handleFilterChange = useCallback((newFilters: QuestionFilterParams) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
-  }, []);
-
-  // Sıralama işlemi
-  const handleSortChange = useCallback((newSort: QuestionSortParams) => {
-    setSort(newSort);
-  }, []);
-
-  // Sayfa değiştirme
-  const handlePageChange = useCallback((newPage: number) => {
-    setPagination(prev => ({ ...prev, currentPage: newPage }));
-  }, []);
-
-  // Soru seçme işlemleri
-  const toggleSelectQuestion = useCallback((questionId: string) => {
-    setSelectedIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(questionId)) {
-        newSet.delete(questionId);
-      } else {
-        newSet.add(questionId);
-      }
-      return newSet;
-    });
-  }, []);
-
-  // Toplu seçim işlemleri
-  const toggleSelectAllOnPage = useCallback(() => {
-    setSelectAllOnPage(prev => {
-      const newValue = !prev;
-      if (newValue) {
-        setSelectedIds(new Set(questions.map(q => q.id)));
-      } else {
-        setSelectedIds(new Set());
-      }
-      return newValue;
-    });
-  }, [questions]);
-
-  // Soru güncelleme işlemi
-  const handleUpdateQuestion = useCallback(async (questionId: string, updates: Partial<Question>) => {
-    try {
-      await questionsApi.updateQuestion(questionId, updates);
-      await fetchQuestions();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Soru güncellenirken bir hata oluştu');
-    }
-  }, [fetchQuestions]);
-
-  // Soru silme işlemi
-  const handleDeleteQuestion = useCallback(async (questionId: string) => {
-    try {
-      await questionsApi.deleteQuestion(questionId);
-      setSelectedIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(questionId);
-        return newSet;
-      });
-      await fetchQuestions();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Soru silinirken bir hata oluştu');
-    }
-  }, [fetchQuestions]);
-
-  // Toplu soru silme işlemi
-  const handleBulkDelete = useCallback(async () => {
-    try {
-      await questionsApi.bulkDeleteQuestions(Array.from(selectedIds));
-      setSelectedIds(new Set());
-      await fetchQuestions();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sorular silinirken bir hata oluştu');
-    }
-  }, [fetchQuestions, selectedIds]);
-
-  // Yenileme ve temizleme işlemleri
   useEffect(() => {
     fetchQuestions();
-  }, [fetchQuestions, refreshKey]);
+  }, [fetchQuestions, refreshKey]); // refreshKey dependency added
 
-  useEffect(() => {
-    return () => {
-      setProgress(null);
-      setIsGenerating(false);
-    };
-  }, []);
+  const handleFilterChange = (newFilters: Partial<QuestionFilters>) => {
+    const updatedFilters = { ...filters, ...newFilters, page: 1 }; // Reset to page 1 on filter change
+    setFilters(updatedFilters);
+    // fetchQuestions will be called by useEffect due to filters dependency change if fetchQuestions depends on filters
+    // Or call directly: fetchQuestions(updatedFilters);
+  };
+
+  const handleSortChange = (newSort: Partial<QuestionFilters>) => { // Assuming sort is part of filters
+    const updatedFilters = { ...filters, ...newSort, page: 1 };
+    setFilters(updatedFilters);
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page > 0 && (!pagination || page <= pagination.totalPages)) {
+      const updatedFilters = { ...filters, page };
+      setFilters(updatedFilters);
+      // fetchQuestions(updatedFilters); // Call directly or let useEffect handle it
+    }
+  };
+
+  const toggleSelectQuestion = (id: number) => {
+    const newSelectedIds = new Set(selectedIds);
+    if (newSelectedIds.has(id)) {
+      newSelectedIds.delete(id);
+    } else {
+      newSelectedIds.add(id);
+    }
+    setSelectedIds(newSelectedIds);
+  };
+
+  const toggleSelectAllOnPage = () => {
+    // Basic implementation: if not all are selected, select all on current page. Else, deselect all.
+    // This needs more robust logic if selections should persist across pages or respect a max limit.
+    if (selectAllOnPage) {
+      setSelectedIds(new Set());
+      setSelectAllOnPage(false);
+    } else {
+      const idsOnPage = questions.map(q => q.id);
+      setSelectedIds(new Set(idsOnPage));
+      setSelectAllOnPage(true);
+    }
+  };
+
+  const handleUpdateQuestion = async (questionData: Question) => {
+    // Placeholder for update logic
+    console.log('Updating question:', questionData);
+    // await questionApi.updateQuestion(questionData.id, questionData);
+    fetchQuestions(); // Refetch after update
+  };
+
+  const handleDeleteQuestion = async (id: number) => {
+    // Placeholder for delete logic
+    console.log('Deleting question ID:', id);
+    // await questionApi.deleteQuestion(id);
+    fetchQuestions(); // Refetch after delete
+  };
+
+  const handleBulkDelete = async () => {
+    // Placeholder for bulk delete
+    console.log('Bulk deleting IDs:', Array.from(selectedIds));
+    // await questionApi.bulkUpdateQuestions({ action: 'delete', question_ids: Array.from(selectedIds) });
+    setSelectedIds(new Set());
+    fetchQuestions(); // Refetch
+  };
+  
+  const handleToggleActiveState = async (questionId: number) => {
+    console.log('Toggling active state for question ID (hook):', questionId);
+    try {
+      await questionApi.toggleQuestionActive(questionId);
+      // Optimistically update UI or refetch
+      setQuestions(prevQuestions => 
+        prevQuestions.map(q => 
+          q.id === questionId ? { ...q, is_active: !q.is_active } : q
+        )
+      );
+      // Or simply call fetchQuestions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to toggle active state');
+    }
+  };
+
 
   return {
     questions,
@@ -157,17 +134,14 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     error,
     pagination,
     filters,
-    sort,
+    // sort, // if sort is a separate state
     selectedIds,
     selectAllOnPage,
     editingQuestion,
     showEditModal,
     questionToDelete,
     showDeleteModal,
-    progress,
-    isGenerating,
-
-    // Method exports
+    
     fetchQuestions,
     handleFilterChange,
     handleSortChange,
@@ -177,11 +151,10 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     handleUpdateQuestion,
     handleDeleteQuestion,
     handleBulkDelete,
-    
-    // Modal control exports
     setEditingQuestion,
     setShowEditModal,
     setQuestionToDelete,
     setShowDeleteModal,
+    handleToggleActiveState, // Exporting the new handler
   };
 };

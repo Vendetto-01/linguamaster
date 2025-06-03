@@ -2,14 +2,15 @@
 import React from 'react';
 import Card from '../shared/Card';
 import Button from '../shared/Button';
-import { Question } from '../../types/questions';
+import type { Question } from '../../types'; // Corrected path and made type-only
 
 interface QuestionCardProps {
   question: Question;
   isSelected: boolean;
-  onSelect: (questionId: string) => void;
-  onToggleActive: (questionId: string) => void;
-  onDelete: (questionId: string) => void;
+  onSelect: (questionId: number) => void;
+  onToggleActive: (questionId: number) => void;
+  onDelete: (questionId: number) => void;
+  onEdit?: (questionId: number) => void; // Added onEdit, changed to number
   isUpdating?: boolean;
 }
 
@@ -19,6 +20,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   onSelect,
   onToggleActive,
   onDelete,
+  onEdit, // Added onEdit to destructuring
   isUpdating = false
 }) => {
   const getDifficultyColor = (difficulty: string): string => {
@@ -30,7 +32,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
     }
   };
 
-  const { word } = question;
+  // const { word } = question; // word_text will be used directly from question
 
   const formatDate = (dateString?: string): string => {
     if (!dateString) return 'N/A';
@@ -68,9 +70,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             />
             
             <h4 style={{ margin: '0', color: '#2c3e50', fontSize: '16px' }}>
-              {word?.word || 'Unknown'} 
+              {question.word_text || 'Unknown Word'}
               <span style={{ fontSize: '14px', color: '#7f8c8d', marginLeft: '8px' }}>
-                (anlam #{word?.meaning_id || '?'})
+                (ID: {question.word_id || 'N/A'})
               </span>
             </h4>
           </div>
@@ -95,7 +97,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
               fontSize: '12px',
               border: '1px solid #dee2e6'
             }}>
-              {word?.part_of_speech || 'unknown'}
+              {question.part_of_speech || 'unknown'}
             </span>
             <span style={{
               backgroundColor: question.is_active ? '#d4edda' : '#f8d7da',
@@ -122,6 +124,16 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             {question.is_active ? '⏸️ Pasif Yap' : '▶️ Aktif Yap'}
           </Button>
           
+          <Button
+            onClick={() => onEdit && onEdit(question.id)} // Add Edit button
+            disabled={isUpdating}
+            variant="info"
+            size="small"
+            aria-label="Soruyu düzenle"
+            style={{ marginRight: '8px' }}
+          >
+            ✏️ Düzenle
+          </Button>
           <Button
             onClick={() => onDelete(question.id)}
             disabled={isUpdating}
@@ -217,11 +229,12 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         paddingTop: '10px'
       }}>
         <div>
-          <strong>Türkçe Karşılık:</strong> {word?.turkish_meaning || 'N/A'}
+          {/* Assuming turkish_meaning is part of word_text or not directly available here based on Question type */}
+          {/* <strong>Türkçe Karşılık:</strong> {question.word_text || 'N/A'} */}
         </div>
         <div>
-          <strong>Gösterilme:</strong> {question.times_shown || 0} | 
-          <strong>Doğru:</strong> {question.times_correct || 0} | 
+          <strong>Yanıtlanma:</strong> {question.times_answered || 0} |
+          <strong>Doğru:</strong> {question.times_correct || 0} |
           <strong>Oluşturulma:</strong> {formatDate(question.created_at)}
         </div>
       </div>

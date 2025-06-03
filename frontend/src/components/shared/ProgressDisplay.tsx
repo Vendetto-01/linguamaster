@@ -1,12 +1,30 @@
 // frontend/src/components/shared/ProgressDisplay.tsx
 import React from 'react';
-import { QuestionGenerationProgress } from '../../types/questions';
+// Assuming UploadProgress is the base and we add other fields, or we use a more generic type
+// For now, let's use a more general type structure directly here,
+// or we can define a combined type in 'types/index.ts' later if needed.
+import type { UploadProgress } from '../../types'; // Use UploadProgress as a base
 
-interface ProgressDisplayProps {
-  progress: QuestionGenerationProgress;
+// Define a more comprehensive progress type for the display component
+interface DisplayProgressData extends UploadProgress {
+  successful: number;
+  failed: number;
+  timeElapsed: number;
 }
 
-const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ progress }) => {
+interface ProgressDisplayProps {
+  progress: DisplayProgressData;
+  title?: string; // Make title optional
+  showStats?: boolean; // Make showStats optional
+  variant?: 'compact' | 'full'; // Define variant type
+}
+
+const ProgressDisplay: React.FC<ProgressDisplayProps> = ({
+  progress,
+  title = "İşlem Durumu", // Default title
+  showStats = true,      // Default to show stats
+  variant = "full"       // Default variant
+}) => {
   const getStageColor = () => {
     switch (progress.stage) {
       case 'complete': return '#28a745';
@@ -35,7 +53,7 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ progress }) => {
       marginBottom: '20px'
     }}>
       <h4 style={{ margin: '0 0 15px 0', color: '#495057' }}>
-        {getStageIcon()} İşlem Durumu
+        {getStageIcon()} {title}
       </h4>
       
       <div style={{ marginBottom: '15px' }}>
@@ -64,26 +82,32 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ progress }) => {
         </div>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-        gap: '10px',
-        fontSize: '14px',
-        color: '#6c757d'
-      }}>
-        <div>
-          <strong>İşlenen:</strong> {progress.current}/{progress.total}
+      {showStats && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: variant === 'compact' ? '1fr' : 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: '10px',
+          fontSize: variant === 'compact' ? '13px' : '14px',
+          color: '#6c757d'
+        }}>
+          <div>
+            <strong>İşlenen:</strong> {progress.current}/{progress.total}
+          </div>
+          {variant !== 'compact' && (
+            <>
+              <div>
+                <strong>Başarılı:</strong> {progress.successful}
+              </div>
+              <div>
+                <strong>Başarısız:</strong> {progress.failed}
+              </div>
+              <div>
+                <strong>Geçen Süre:</strong> {progress.timeElapsed.toFixed(1)}s
+              </div>
+            </>
+          )}
         </div>
-        <div>
-          <strong>Başarılı:</strong> {progress.successful}
-        </div>
-        <div>
-          <strong>Başarısız:</strong> {progress.failed}
-        </div>
-        <div>
-          <strong>Geçen Süre:</strong> {progress.timeElapsed.toFixed(1)}s
-        </div>
-      </div>
+      )}
     </div>
   );
 };

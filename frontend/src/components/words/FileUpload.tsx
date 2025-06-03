@@ -1,7 +1,7 @@
 // frontend/src/components/words/FileUpload.tsx - GÜNCELLENMİŞ VERSİYON
 import React, { useState, useRef, useCallback } from 'react';
 import { wordApi } from '../../services/api';
-import { FileUploadProps, FileUploadResponse, UploadProgress } from '../../types';
+import type { FileUploadProps, FileUploadResponse, UploadProgress } from '../../types';
 import ProgressDisplay from '../shared/ProgressDisplay';
 import DropZone from '../shared/DropZone'; // DropZone component'i import edildi
 
