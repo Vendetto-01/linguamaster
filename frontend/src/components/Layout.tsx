@@ -7,7 +7,7 @@ const Layout: React.FC = () => {
     <div className="layout-container">
       <nav className="navbar">
         <div className="navbar-brand">
-          <Link to="/" className="navbar-item brand-text">WordWizard Admin</Link>
+          <Link to="/" className="navbar-item brand-text">Admin Paneli</Link>
         </div>
         <div className="navbar-menu">
           <div className="navbar-start">
@@ -32,7 +32,7 @@ const Layout: React.FC = () => {
         <Outlet /> {/* Page content will be rendered here */}
       </main>
       <footer className="footer">
-        <p>&copy; {new Date().getFullYear()} WordWizard. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Admin Paneli. All rights reserved.</p>
       </footer>
     </div>
   );

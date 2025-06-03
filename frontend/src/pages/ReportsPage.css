@@ -1,0 +1,56 @@
+/* ReportsPage.css */
+.reports-container {
+  padding: 1rem;
+}
+
+.reports-container h2 {
+  color: #2c3e50; /* Dark blue/charcoal */
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #1abc9c; /* Teal accent */
+  padding-bottom: 0.5rem;
+}
+
+.table-wrapper {
+  overflow-x: auto; /* Allows table to be scrolled horizontally on small screens */
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.reports-table th,
+.reports-table td {
+  border: 1px solid #dfe6e9; /* Lighter grey border */
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.reports-table th {
+  background-color: #ecf0f1; /* Light silver background for headers */
+  color: #2c3e50; /* Dark text for headers */
+  font-weight: 600;
+  position: sticky; /* Makes header sticky if table wrapper has a height and overflow-y */
+  top: 0; /* Required for sticky */
+  z-index: 10;
+}
+
+.reports-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa; /* Slightly off-white for even rows */
+}
+
+.reports-table tbody tr:hover {
+  background-color: #e9ecef; /* Light grey hover for rows */
+}
+
+.reports-table td {
+  color: #555;
+}
+
+/* Responsive considerations: On very small screens, the table will scroll.
+   You might add more specific responsive styles if needed. */
