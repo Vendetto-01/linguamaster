@@ -1,0 +1,281 @@
+/* frontend/src/components/questions/WordSelection.css */
+.wordSelectionContainer {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.wsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.wsHeader h2 {
+  margin: 0;
+  color: #343a40;
+}
+
+.wsHeaderActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.wsSelectedCount {
+  font-size: 14px;
+  color: #6c757d;
+  font-weight: bold;
+}
+
+.wsSelectedCount.hasSelection {
+  color: #28a745;
+}
+
+.wsButton {
+  padding: 8px 12px;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.wsButton.refresh {
+  background-color: #28a745; /* Sorular modülü rengi */
+}
+.wsButton.refresh:hover:not(:disabled) {
+  background-color: #1e7e34;
+}
+
+.wsButton:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.wsSelectedInfoBar {
+  background-color: #d4edda; /* Yeşil tonu */
+  border: 1px solid #c3e6cb;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.wsSelectedInfoContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wsSelectedInfoText strong {
+  color: #155724;
+}
+.wsSelectedInfoText div {
+  font-size: 14px;
+  margin-top: 5px;
+  color: #155724; /* Biraz daha koyu */
+}
+
+.wsSelectedInfoButtons {
+  display: flex;
+  gap: 10px;
+}
+
+.wsButton.clearAll {
+  background-color: #dc3545; /* Kırmızı */
+}
+.wsButton.clearAll:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.wsButton.proceed {
+  background-color: #28a745; /* Yeşil */
+  font-weight: bold;
+}
+.wsButton.proceed:hover:not(:disabled) {
+  background-color: #1e7e34;
+}
+
+
+.wsFilterContainer {
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.wsFilterForm {
+  margin-bottom: 15px;
+}
+
+.wsFilterFormInner {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.wsFilterGroup {
+  flex: 1;
+  min-width: 180px;
+}
+
+.wsFilterLabel {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #495057;
+}
+
+.wsFilterInput,
+.wsFilterSelect {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wsFilterInput:focus,
+.wsFilterSelect:focus {
+  border-color: #80bdff; /* Mavi focus rengi */
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.wsFilterActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.wsButton.selectAllPage {
+  background-color: #28a745; /* Yeşil */
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.wsButton.deselectAllPage {
+  background-color: #dc3545; /* Kırmızı */
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.wsPageInfoText {
+  font-size: 13px;
+  color: #6c757d;
+}
+
+.wsLoadingMessage, .wsErrorMessageContainer {
+  text-align: center;
+  padding: 40px; /* Daha fazla boşluk */
+  font-size: 18px;
+  color: #6c757d;
+}
+
+.wsErrorMessage {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 15px;
+  border-radius: 5px;
+  border: 1px solid #f5c6cb;
+  display: inline-block; /* Hata mesajının genişliğini içeriğe göre ayarla */
+}
+
+.wsListHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.wsListHeader h3 {
+  margin: 0;
+  color: #343a40;
+}
+
+.wsListInfoText {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+/* WordSelection içindeki WordCard'lara özel sarmalayıcı veya grid stilleri */
+.wsWordCardsGrid {
+  display: grid;
+  gap: 15px;
+  /* İstenirse sütunlu yapı için: grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); */
+}
+
+.wsNoWordsContainer {
+  text-align: center;
+  padding: 40px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.wsNoWordsIcon {
+  font-size: 48px;
+  margin-bottom: 10px;
+  color: #6c757d;
+}
+
+.wsNoWordsTitle {
+  color: #495057;
+  margin-bottom: 8px;
+}
+
+.wsNoWordsText {
+  color: #6c757d;
+  margin-bottom: 15px;
+}
+
+.wsButton.clearFilters {
+  background-color: #17a2b8; /* Info rengi */
+}
+.wsButton.clearFilters:hover:not(:disabled) {
+  background-color: #117a8b;
+}
+
+.wsInfoFooter {
+  background-color: #e9ecef;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 30px;
+  font-size: 14px;
+  color: #495057;
+}
+
+.wsInfoFooter h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #343a40;
+}
+
+.wsInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.wsInfoList {
+  margin: 5px 0 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  list-style-type: disc;
+}
+
+.wsInfoList li {
+  margin-bottom: 5px;
+}
+
+/* Pagination component'i kendi stillerine sahip olmalı */
+/* WordCard component'i kendi stillerine sahip olmalı. WordSelection içinde ek bir stil gerekirse buraya eklenebilir.
+   Örneğin seçili kart için ekstra bir border veya overlay:
+.wsWordCardWrapper.selected .actualWordCardComponent {
+  border: 2px solid #28a745; // Örnek
+}
+*/

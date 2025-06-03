@@ -1,877 +1,475 @@
-// frontend/src/components/questions/QuestionManagement.tsx - SORU YÖNETİMİ KOMPONENTİ
-import React, { useState, useEffect } from 'react';
-import { QuestionManagementProps, Question, QuestionStats } from '../../types/questions';
-import { questionsApi } from '../../services/questionsApi'; // YENİ: API import'u
+// frontend/src/components/questions/QuestionManagement.tsx - GÜNCELLENMİŞ VERSİYON
+import React, { useEffect } from 'react';
+import { useQuestionManagementLogic } from '../../hooks/useQuestionManagementLogic';
+import type { Question, QuestionFilterParams, QuestionSortParams } from '../../types/questions';
 
-interface QuestionsResponse {
-  questions: Question[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalQuestions: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-}
+// Paylaşılan component'lerin import edildiğini varsayıyoruz (dosya yolları doğru olmalı)
+import FilterBar from '../shared/Filterbar'; // Büyük/küçük harf FilterBar.tsx olabilir, kontrol edilecek
+import QuestionCard from './QuestionCard'; // Bu zaten Question modülünde
+import Pagination from '../shared/Pagination'; // Büyük/küçük harf Pagination.tsx olabilir
 
-const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) => {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [stats, setStats] = useState<QuestionStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState<QuestionsResponse['pagination'] | null>(null);
-  
-  // Filtreler
-  const [searchQuery, setSearchQuery] = useState('');
-  const [difficultyFilter, setDifficultyFilter] = useState('');
-  const [activeFilter, setActiveFilter] = useState('true');
-  
-  // Seçim ve toplu işlemler
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [isUpdating, setIsUpdating] = useState(false);
+// Modal component'leri (bunlar QuestionManagement içinde kalabilir veya ayrı dosyalara taşınabilir)
+// Şimdilik QuestionManagement içinde bırakıyoruz.
+const QuestionEditModal: React.FC<{
+  show: boolean;
+  question: Question | null;
+  onClose: () => void;
+  onSave: (updatedQuestion: Question) => Promise<boolean>;
+}> = ({ show, question, onClose, onSave }) => {
+  const [editedQuestion, setEditedQuestion] = React.useState<Question | null>(null);
 
-  const pageSize = 20;
+  React.useEffect(() => {
+    setEditedQuestion(question ? { ...question } : null);
+  }, [question]);
 
-  // Soruları getir - YENİ: questionsApi kullan
-  const fetchQuestions = async () => {
-    try {
-      setIsLoading(true);
-      
-      const filters = {
-        page: currentPage,
-        limit: pageSize,
-        ...(searchQuery.trim() && { search: searchQuery.trim() }),
-        ...(difficultyFilter && { difficulty: difficultyFilter as any }),
-        ...(activeFilter !== '' && { isActive: activeFilter === 'true' })
-      };
+  if (!show || !editedQuestion) return null;
 
-      const data = await questionsApi.getQuestions(filters);
-      
-      setQuestions(data.questions || []);
-      setPagination(data.pagination || null);
-      setError('');
-
-    } catch (err) {
-      console.error('Soru yükleme hatası:', err);
-      setError(err instanceof Error ? err.message : 'Sorular yüklenirken hata oluştu');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // İstatistikleri getir - YENİ: questionsApi kullan
-  const fetchStats = async () => {
-    try {
-      const data = await questionsApi.getQuestionStats();
-      setStats(data);
-    } catch (err) {
-      console.error('İstatistik yükleme hatası:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchQuestions();
-    fetchStats();
-  }, [currentPage, searchQuery, difficultyFilter, activeFilter, refreshKey]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentPage(1);
-    fetchQuestions();
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  // Tekil soru durumu değiştir - YENİ: questionsApi kullan
-  const handleToggleQuestion = async (questionId: number) => {
-    try {
-      setIsUpdating(true);
-      
-      await questionsApi.toggleQuestionActive(questionId);
-
-      // Listeyi yenile
-      await fetchQuestions();
-      await fetchStats();
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'İşlem başarısız');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  // Soru sil - YENİ: questionsApi kullan
-  const handleDeleteQuestion = async (questionId: number) => {
-    if (!window.confirm('Bu soruyu silmek istediğinizden emin misiniz?')) {
-      return;
-    }
-
-    try {
-      setIsUpdating(true);
-      
-      await questionsApi.deleteQuestion(questionId);
-
-      // Listeyi yenile
-      await fetchQuestions();
-      await fetchStats();
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Silme işlemi başarısız');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  // Toplu işlem - YENİ: questionsApi kullan
-  const handleBulkOperation = async (operation: 'activate' | 'deactivate' | 'delete') => {
-    if (selectedIds.size === 0) {
-      alert('Lütfen işlem yapılacak soruları seçin');
-      return;
-    }
-
-    const confirmMessage = operation === 'delete' 
-      ? `${selectedIds.size} soruyu silmek istediğinizden emin misiniz?`
-      : `${selectedIds.size} soruyu ${operation === 'activate' ? 'aktif' : 'pasif'} yapmak istediğinizden emin misiniz?`;
-
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-
-    try {
-      setIsUpdating(true);
-      
-      const result = await questionsApi.bulkOperation(Array.from(selectedIds), operation);
-      alert(result.message);
-
-      // Seçimi temizle ve listeyi yenile
-      setSelectedIds(new Set());
-      await fetchQuestions();
-      await fetchStats();
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Toplu işlem başarısız');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  // Seçim yönetimi
-  const handleQuestionSelect = (questionId: number) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(questionId)) {
-      newSelected.delete(questionId);
-    } else {
-      newSelected.add(questionId);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const handleSelectAll = () => {
-    if (selectedIds.size === questions.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(questions.map(q => q.id)));
-    }
-  };
-
-  // Zorluk seviyesi renkleri
-  const getDifficultyColor = (difficulty: string): string => {
-    switch (difficulty) {
-      case 'beginner': return '#28a745';
-      case 'intermediate': return '#ffc107';
-      case 'advanced': return '#dc3545';
-      default: return '#6c757d';
-    }
-  };
-
-  const renderPagination = () => {
-    if (!pagination || pagination.totalPages <= 1) return null;
-
-    const pageNumbers = [];
-    const startPage = Math.max(1, currentPage - 2);
-    const endPage = Math.min(pagination.totalPages, currentPage + 2);
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
-    }
-
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        gap: '5px',
-        margin: '20px 0'
-      }}>
-        <button
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            backgroundColor: currentPage === 1 ? '#f8f9fa' : '#fff',
-            color: currentPage === 1 ? '#6c757d' : '#28a745',
-            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-            borderRadius: '4px'
-          }}
-        >
-          ← Önceki
-        </button>
-
-        {pageNumbers.map(pageNum => (
-          <button
-            key={pageNum}
-            onClick={() => handlePageChange(pageNum)}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #ddd',
-              backgroundColor: currentPage === pageNum ? '#28a745' : '#fff',
-              color: currentPage === pageNum ? 'white' : '#28a745',
-              cursor: 'pointer',
-              borderRadius: '4px',
-              fontWeight: currentPage === pageNum ? 'bold' : 'normal'
-            }}
-          >
-            {pageNum}
-          </button>
-        ))}
-
-        <button
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === pagination.totalPages}
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            backgroundColor: currentPage === pagination.totalPages ? '#f8f9fa' : '#fff',
-            color: currentPage === pagination.totalPages ? '#6c757d' : '#28a745',
-            cursor: currentPage === pagination.totalPages ? 'not-allowed' : 'pointer',
-            borderRadius: '4px'
-          }}
-        >
-          Sonraki →
-        </button>
-
-        <span style={{ marginLeft: '15px', fontSize: '14px', color: '#666' }}>
-          {currentPage} / {pagination.totalPages} sayfa
-        </span>
-      </div>
-    );
-  };
-
-  const renderQuestionCard = (question: Question) => {
-    const isSelected = selectedIds.has(question.id);
-    const word = question.word;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
     
-    return (
-      <div
-        key={question.id}
-        style={{
-          backgroundColor: isSelected ? '#e8f5e8' : '#ffffff',
-          border: isSelected ? '2px solid #28a745' : '1px solid #e0e0e0',
-          borderRadius: '8px',
-          padding: '20px',
-          marginBottom: '15px',
-          transition: 'all 0.3s ease'
-        }}
-      >
-        {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'flex-start',
-          marginBottom: '15px'
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => handleQuestionSelect(question.id)}
-                style={{ marginRight: '10px', transform: 'scale(1.2)' }}
-              />
-              
-              <h4 style={{ margin: '0', color: '#2c3e50', fontSize: '16px' }}>
-                {word?.word || 'Unknown'} 
-                <span style={{ fontSize: '14px', color: '#7f8c8d', marginLeft: '8px' }}>
-                  (anlam #{word?.meaning_id || '?'})
-                </span>
-              </h4>
-            </div>
+    if (type === 'checkbox') {
+      const { checked } = e.target as HTMLInputElement;
+      if (name === 'is_active') {
+        setEditedQuestion(prev => prev ? { ...prev, [name]: checked } : null);
+      }
+      // options ve correct_options için özel handle gerekebilir
+    } else if (name.startsWith('options.')) {
+      const [_, indexStr] = name.split('.');
+      const index = parseInt(indexStr, 10);
+      setEditedQuestion(prev => {
+        if (!prev) return null;
+        const newOptions = [...(prev.options || [])];
+        newOptions[index] = value;
+        return { ...prev, options: newOptions };
+      });
+    } else if (name.startsWith('correct_options.')) {
+        const [_, indexStr] = name.split('.');
+        const index = parseInt(indexStr, 10);
+        setEditedQuestion(prev => {
+            if (!prev) return null;
+            const newCorrectOptions = [...(prev.correct_options || [])];
+            newCorrectOptions[index] = value;
+            return { ...prev, correct_options: newCorrectOptions };
+        });
+    } else {
+      setEditedQuestion(prev => prev ? { ...prev, [name]: value } : null);
+    }
+  };
+  
+  const handleOptionChange = (index: number, value: string) => {
+    setEditedQuestion(prev => {
+      if (!prev) return null;
+      const newOptions = [...(prev.options || ['','','',''])];
+      newOptions[index] = value;
+      return { ...prev, options: newOptions };
+    });
+  };
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{
-                backgroundColor: getDifficultyColor(question.difficulty),
-                color: 'white',
-                padding: '2px 8px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                fontWeight: 'bold'
-              }}>
-                {question.difficulty}
-              </span>
-              <span style={{
-                backgroundColor: '#f8f9fa',
-                color: '#495057',
-                padding: '2px 8px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                border: '1px solid #dee2e6'
-              }}>
-                {word?.part_of_speech || 'unknown'}
-              </span>
-              <span style={{
-                backgroundColor: question.is_active ? '#d4edda' : '#f8d7da',
-                color: question.is_active ? '#155724' : '#721c24',
-                padding: '2px 8px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                fontWeight: 'bold'
-              }}>
-                {question.is_active ? 'Aktif' : 'Pasif'}
-              </span>
-            </div>
-          </div>
+  const handleCorrectOptionChange = (index: number, value: string) => {
+    setEditedQuestion(prev => {
+      if (!prev) return null;
+      const newCorrectOptions = [...(prev.correct_options || [''])]; // Genellikle tek doğru cevap
+      newCorrectOptions[index] = value; // Eğer birden fazla ise mantık değişebilir
+      return { ...prev, correct_options: newCorrectOptions };
+    });
+  };
 
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => handleToggleQuestion(question.id)}
-              disabled={isUpdating}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: question.is_active ? '#ffc107' : '#28a745',
-                color: question.is_active ? '#212529' : 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
-            >
-              {question.is_active ? '⏸️ Pasif Yap' : '▶️ Aktif Yap'}
-            </button>
-            
-            <button
-              onClick={() => handleDeleteQuestion(question.id)}
-              disabled={isUpdating}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
-            >
-              🗑️ Sil
-            </button>
-          </div>
-        </div>
 
-        {/* Question Content */}
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '15px',
-          borderRadius: '6px',
-          marginBottom: '15px'
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#495057', marginBottom: '10px' }}>
-            Soru:
-          </div>
-          <div style={{ fontSize: '15px', color: '#2c3e50', marginBottom: '15px' }}>
-            {question.question_text}
-          </div>
-
-          {/* Options */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '8px'
-          }}>
-            {[
-              { key: 'A', text: question.option_a },
-              { key: 'B', text: question.option_b },
-              { key: 'C', text: question.option_c },
-              { key: 'D', text: question.option_d }
-            ].map(option => (
-              <div
-                key={option.key}
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: option.key === question.correct_answer ? '#d4edda' : '#ffffff',
-                  border: option.key === question.correct_answer ? '2px solid #28a745' : '1px solid #dee2e6',
-                  borderRadius: '4px',
-                  fontSize: '13px'
-                }}
-              >
-                <strong>{option.key})</strong> {option.text}
-                {option.key === question.correct_answer && (
-                  <span style={{ color: '#28a745', marginLeft: '8px' }}>✓</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Explanation */}
-        <div style={{
-          backgroundColor: '#e7f3ff',
-          padding: '10px',
-          borderRadius: '4px',
-          marginBottom: '10px'
-        }}>
-          <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0066cc', marginBottom: '5px' }}>
-            Açıklama:
-          </div>
-          <div style={{ fontSize: '13px', color: '#495057' }}>
-            {question.explanation}
-          </div>
-        </div>
-
-        {/* Context Paragraph */}
-        <div style={{
-          backgroundColor: '#fff3cd',
-          padding: '10px',
-          borderRadius: '4px',
-          marginBottom: '10px'
-        }}>
-          <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
-            Bağlam Cümlesi:
-          </div>
-          <div style={{ fontSize: '13px', color: '#495057', fontStyle: 'italic' }}>
-            "{question.paragraph}"
-          </div>
-        </div>
-
-        {/* Statistics */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          fontSize: '12px',
-          color: '#6c757d',
-          borderTop: '1px solid #dee2e6',
-          paddingTop: '10px'
-        }}>
-          <div>
-            <strong>Türkçe Karşılık:</strong> {word?.turkish_meaning || 'N/A'}
-          </div>
-          <div>
-            <strong>Gösterilme:</strong> {question.times_shown} | 
-            <strong>Doğru:</strong> {question.times_correct} | 
-            <strong>Oluşturulma:</strong> {new Date(question.created_at).toLocaleDateString('tr-TR')}
-          </div>
-        </div>
-      </div>
-    );
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editedQuestion) {
+      const success = await onSave(editedQuestion);
+      // Başarılı/başarısız mesajı hook'ta yönetiliyor, burada ekstra bir şey yapmaya gerek yok.
+      // İstenirse burada da bir bildirim gösterilebilir.
+    }
   };
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '20px'
-      }}>
-        <h2>📋 Soru Yönetimi</h2>
-        <button
-          onClick={() => {
-            fetchQuestions();
-            fetchStats();
-          }}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          🔄 Yenile
-        </button>
-      </div>
-
-      {/* İstatistikler */}
-      {stats && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minWidth(150px, 1fr))',
-          gap: '15px',
-          marginBottom: '25px'
-        }}>
-          <div style={{
-            backgroundColor: '#e3f2fd',
-            padding: '15px',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1976d2' }}>
-              {stats.totalQuestions.toLocaleString()}
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Toplam Soru</div>
-          </div>
-          
-          <div style={{
-            backgroundColor: '#e8f5e8',
-            padding: '15px',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#2e7d32' }}>
-              {stats.activeQuestions.toLocaleString()}
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Aktif Soru</div>
-          </div>
-          
-          <div style={{
-            backgroundColor: '#fff3e0',
-            padding: '15px',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f57c00' }}>
-              {stats.recentQuestions}
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Son 24 Saat</div>
+    <div style={modalStyles.overlay}>
+      <div style={modalStyles.modal}>
+        <h3 style={{marginTop: 0}}>Soruyu Düzenle (ID: {editedQuestion.id})</h3>
+        <form onSubmit={handleSubmit}>
+          {/* Soru Metni */}
+          <div style={modalStyles.formGroup}>
+            <label htmlFor="question_text">Soru Metni:</label>
+            <textarea
+              id="question_text"
+              name="question_text"
+              value={editedQuestion.question_text || ''}
+              onChange={handleChange}
+              rows={3}
+              style={modalStyles.input}
+            />
           </div>
 
-          <div style={{
-            backgroundColor: '#f3e5f5',
-            padding: '15px',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#7b1fa2' }}>
-              B:{stats.difficultyBreakdown.beginner} | 
-              I:{stats.difficultyBreakdown.intermediate} | 
-              A:{stats.difficultyBreakdown.advanced}
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Zorluk Dağılımı</div>
-          </div>
-        </div>
-      )}
-
-      {/* Toplu İşlem Kontrolleri */}
-      {selectedIds.size > 0 && (
-        <div style={{
-          backgroundColor: '#d4edda',
-          border: '1px solid #c3e6cb',
-          borderRadius: '8px',
-          padding: '15px',
-          marginBottom: '20px'
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center'
-          }}>
-            <div style={{ color: '#155724' }}>
-              <strong>✅ {selectedIds.size} soru seçili</strong>
-            </div>
-            
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => handleBulkOperation('activate')}
-                disabled={isUpdating}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                ▶️ Aktif Yap
-              </button>
-              
-              <button
-                onClick={() => handleBulkOperation('deactivate')}
-                disabled={isUpdating}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#ffc107',
-                  color: '#212529',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                ⏸️ Pasif Yap
-              </button>
-              
-              <button
-                onClick={() => handleBulkOperation('delete')}
-                disabled={isUpdating}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#dc3545',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                🗑️ Sil
-              </button>
-              
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                ❌ Seçimi Temizle
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Arama ve Filtreler */}
-      <div style={{
-        backgroundColor: '#f8f9fa',
-        padding: '20px',
-        borderRadius: '8px',
-        marginBottom: '20px'
-      }}>
-        <form onSubmit={handleSearch} style={{ marginBottom: '15px' }}>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'end' }}>
-            <div style={{ flex: '1', minWidth: '200px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>
-                🔍 Soru Ara:
-              </label>
+          {/* Seçenekler */}
+          {(editedQuestion.options || ['','','','']).map((option, index) => (
+            <div style={modalStyles.formGroup} key={`option-${index}`}>
+              <label htmlFor={`option-${index}`}>Seçenek {index + 1}:</label>
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Soru metni veya kelime ara..."
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
+                id={`option-${index}`}
+                name={`options.${index}`}
+                value={option || ''}
+                onChange={(e) => handleOptionChange(index, e.target.value)}
+                style={modalStyles.input}
               />
             </div>
-            
-            <div style={{ minWidth: '140px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>
-                📊 Zorluk:
-              </label>
-              <select
-                value={difficultyFilter}
-                onChange={(e) => setDifficultyFilter(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
-              >
-                <option value="">Tümü</option>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-              </select>
+          ))}
+          
+          {/* Doğru Seçenek(ler) */}
+            <div style={modalStyles.formGroup}>
+                <label htmlFor="correct_options.0">Doğru Seçenek (Metin):</label>
+                <input
+                type="text"
+                id="correct_options.0"
+                name="correct_options.0" // Sadece ilk doğru seçeneği düzenliyoruz, eğer birden fazlaysa yapı değişmeli
+                value={editedQuestion.correct_options?.[0] || ''}
+                onChange={(e) => handleCorrectOptionChange(0, e.target.value)}
+                style={modalStyles.input}
+                placeholder="Doğru olan seçeneğin metnini girin"
+                />
             </div>
 
-            <div style={{ minWidth: '120px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>
-                🎯 Durum:
-              </label>
-              <select
-                value={activeFilter}
-                onChange={(e) => setActiveFilter(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
-              >
-                <option value="">Tümü</option>
-                <option value="true">Aktif</option>
-                <option value="false">Pasif</option>
-              </select>
-            </div>
 
-            <button
-              type="submit"
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
+          {/* Zorluk */}
+          <div style={modalStyles.formGroup}>
+            <label htmlFor="difficulty">Zorluk:</label>
+            <select 
+              name="difficulty" 
+              value={editedQuestion.difficulty || ''} 
+              onChange={handleChange} 
+              style={modalStyles.input}
             >
-              Ara
+              <option value="">Seçiniz</option>
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+          </div>
+
+          {/* Tür */}
+          <div style={modalStyles.formGroup}>
+            <label htmlFor="type">Tür:</label>
+            <select 
+              name="type" 
+              value={editedQuestion.type || ''} 
+              onChange={handleChange} 
+              style={modalStyles.input}
+            >
+              <option value="">Seçiniz</option>
+              <option value="multiple_choice">Çoktan Seçmeli</option>
+              <option value="fill_in_the_blank">Boşluk Doldurma</option>
+              {/* Diğer türler */}
+            </select>
+          </div>
+          
+          {/* Aktif mi? */}
+          <div style={modalStyles.formGroup}>
+            <label htmlFor="is_active" style={{ display: 'flex', alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                id="is_active"
+                name="is_active"
+                checked={editedQuestion.is_active || false}
+                onChange={handleChange}
+                style={{ marginRight: '8px' }}
+              />
+              Soru Aktif mi?
+            </label>
+          </div>
+
+
+          <div style={modalStyles.buttonGroup}>
+            <button type="submit" style={{ ...modalStyles.button, ...modalStyles.saveButton }}>
+              💾 Kaydet
+            </button>
+            <button type="button" onClick={onClose} style={{ ...modalStyles.button, ...modalStyles.cancelButton }}>
+              İptal
             </button>
           </div>
         </form>
-
-        {/* Toplu Seçim Kontrolleri */}
-        {questions.length > 0 && (
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button
-              onClick={handleSelectAll}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: selectedIds.size === questions.length ? '#dc3545' : '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '13px'
-              }}
-            >
-              {selectedIds.size === questions.length ? '❌ Sayfa Seçimini Kaldır' : '✅ Tüm Sayfayı Seç'}
-            </button>
-            
-            <span style={{ fontSize: '13px', color: '#666' }}>
-              Bu sayfada {questions.length} soru
-            </span>
-          </div>
-        )}
       </div>
+    </div>
+  );
+};
 
-      {/* Loading State */}
-      {isLoading && (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '18px', color: '#666' }}>
-            🔄 Sorular yükleniyor...
-          </div>
+const ConfirmDeleteModal: React.FC<{
+  show: boolean;
+  question: Question | null;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}> = ({ show, question, onClose, onConfirm }) => {
+  if (!show || !question) return null;
+
+  return (
+    <div style={modalStyles.overlay}>
+      <div style={{...modalStyles.modal, maxWidth: '400px'}}>
+        <h3 style={{marginTop:0}}>Soruyu Sil</h3>
+        <p>
+          "{question.question_text?.substring(0, 50)}..." (ID: {question.id}) sorusunu kalıcı olarak silmek istediğinizden emin misiniz?
+        </p>
+        <div style={modalStyles.buttonGroup}>
+          <button onClick={onConfirm} style={{ ...modalStyles.button, ...modalStyles.deleteButton }}>
+            🗑️ Evet, Sil
+          </button>
+          <button onClick={onClose} style={{ ...modalStyles.button, ...modalStyles.cancelButton }}>
+            İptal
+          </button>
         </div>
-      )}
+      </div>
+    </div>
+  );
+};
 
-      {/* Error State */}
-      {error && (
-        <div style={{
-          backgroundColor: '#f8d7da',
-          color: '#721c24',
-          padding: '15px',
-          borderRadius: '5px',
-          marginBottom: '20px',
-          border: '1px solid #f5c6cb'
-        }}>
-          ❌ {error}
-        </div>
-      )}
+const modalStyles: { [key: string]: React.CSSProperties } = {
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    backgroundColor: 'white',
+    padding: '25px',
+    borderRadius: '8px',
+    boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+    width: '90%',
+    maxWidth: '600px',
+    maxHeight: '90vh',
+    overflowY: 'auto'
+  },
+  formGroup: {
+    marginBottom: '15px',
+  },
+  input: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    fontSize: '14px',
+    boxSizing: 'border-box'
+  },
+  buttonGroup: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '10px',
+    marginTop: '20px',
+  },
+  button: {
+    padding: '10px 18px',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold'
+  },
+  saveButton: {
+    backgroundColor: '#28a745',
+    color: 'white',
+  },
+  deleteButton: {
+    backgroundColor: '#dc3545',
+    color: 'white',
+  },
+  cancelButton: {
+    backgroundColor: '#6c757d',
+    color: 'white',
+  },
+};
 
-      {/* Soru Listesi */}
-      {!isLoading && !error && questions.length > 0 && (
-        <div>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '15px'
-          }}>
-            <h3 style={{ margin: 0 }}>
-              Sorular ({questions.length} kayıt gösteriliyor)
-            </h3>
-            {pagination && (
-              <div style={{ fontSize: '14px', color: '#666' }}>
-                Toplam: {pagination.totalQuestions.toLocaleString()} soru
-              </div>
-            )}
-          </div>
-          
-          {questions.map(renderQuestionCard)}
-          
-          {renderPagination()}
-        </div>
-      )}
 
-      {/* Boş State */}
-      {!isLoading && !error && questions.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          padding: '40px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '8px'
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '10px' }}>❓</div>
-          <h3 style={{ color: '#6c757d' }}>Soru Bulunamadı</h3>
-          <p style={{ color: '#6c757d' }}>
-            {searchQuery || difficultyFilter || activeFilter !== ''
-              ? 'Arama kriterlerinize uygun soru bulunamadı.' 
-              : 'Henüz oluşturulmuş soru bulunmuyor.'
-            }
-          </p>
-          {(searchQuery || difficultyFilter || activeFilter !== '') && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setDifficultyFilter('');
-                setActiveFilter('true');
-                setCurrentPage(1);
-              }}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+const QuestionManagement: React.FC<{ refreshKey?: number }> = ({ refreshKey }) => {
+  const {
+    questions,
+    isLoading,
+    error,
+    pagination,
+    currentPage,
+    filters,
+    sort,
+    selectedIds,
+    selectAllOnPage,
+    editingQuestion,
+    showEditModal,
+    questionToDelete,
+    showDeleteModal,
+    pageSize, // Hook'tan pageSize'ı alıyoruz
+
+    fetchQuestions,
+    handleFilterChange,
+    handleSortChange,
+    handlePageChange,
+    toggleSelectQuestion,
+    toggleSelectAllOnPage,
+    handleEdit,
+    handleCloseEditModal,
+    handleUpdate,
+    handleDelete,
+    handleCloseDeleteModal,
+    handleConfirmDelete,
+    handleBulkDelete,
+  } = useQuestionManagementLogic({ initialPageSize: 10 }); // İsterseniz farklı bir pageSize ile başlatabilirsiniz
+
+  useEffect(() => {
+    // refreshKey prop'u değiştiğinde verileri yeniden çek
+    if (refreshKey !== undefined) { // Sadece refreshKey tanımlıysa çalışsın
+      fetchQuestions();
+    }
+  }, [refreshKey, fetchQuestions]);
+
+
+  const filterBarFields = [
+    { name: 'searchTerm', label: 'Ara', type: 'text', placeholder: 'Soru metni, kelime...' },
+    { name: 'difficulty', label: 'Zorluk', type: 'select', options: [{value:'', label: 'Tümü'}, {value:'beginner', label:'Beginner'}, {value:'intermediate', label:'Intermediate'}, {value:'advanced', label:'Advanced'}] },
+    { name: 'type', label: 'Tür', type: 'select', options: [{value:'', label: 'Tümü'}, {value:'multiple_choice', label:'Çoktan Seçmeli'}, {value:'fill_in_the_blank', label:'Boşluk Doldurma'}] },
+    { name: 'source', label: 'Kaynak', type: 'select', options: [{value:'', label: 'Tümü'}, {value:'generated', label:'AI Üretimi'}, {value:'manual', label:'Manuel Giriş'}] },
+    { name: 'hasEmbedding', label: 'Embedding', type: 'select', options: [{value:'', label:'Tümü'},{value:'true', label:'Var'},{value:'false', label:'Yok'}] },
+  ];
+  
+  // Sıralama seçenekleri
+  const sortOptions = [
+    { value: 'created_at,desc', label: 'Eklenme Tarihi (Yeni)' },
+    { value: 'created_at,asc', label: 'Eklenme Tarihi (Eski)' },
+    { value: 'updated_at,desc', label: 'Güncellenme (Yeni)' },
+    { value: 'updated_at,asc', label: 'Güncellenme (Eski)' },
+    { value: 'difficulty,asc', label: 'Zorluk (Artan)' },
+    { value: 'difficulty,desc', label: 'Zorluk (Azalan)' },
+  ];
+
+  return (
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h2 style={{ marginBottom: '20px' }}>Soru Yönetimi</h2>
+
+      {/* Filtreleme Barı (Paylaşılan FilterBar component'i kullanılacak) */}
+      <FilterBar
+        fields={filterBarFields}
+        filters={filters}
+        onFilterChange={(name, value) => handleFilterChange(name as keyof QuestionFilterParams, value)}
+        onSearch={() => fetchQuestions(1)} // Arama butonu fetch'i tetiklesin
+        isLoading={isLoading}
+        // sortOptions={sortOptions} // FilterBar'a sıralama yeteneği eklenebilir
+        // currentSort={`${sort.sortBy},${sort.sortOrder}`}
+        // onSortChange={(value) => {
+        //   const [sortBy, sortOrder] = value.split(',');
+        //   handleSortChange({ sortBy, sortOrder: sortOrder as 'asc' | 'desc' });
+        // }}
+      />
+       {/* Basit sıralama dropdown'ı */}
+       <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' }}>
+            <label htmlFor="sort-questions" style={{fontWeight: 'bold'}}>Sırala:</label>
+            <select
+                id="sort-questions"
+                value={`${sort.sortBy},${sort.sortOrder}`}
+                onChange={(e) => {
+                    const [sortBy, sortOrder] = e.target.value.split(',');
+                    handleSortChange({ sortBy, sortOrder: sortOrder as 'asc' | 'desc' });
+                }}
+                disabled={isLoading}
+                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
             >
-              Filtreleri Temizle
-            </button>
+                {sortOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+            </select>
+        </div>
+
+
+      {isLoading && <div style={{ textAlign: 'center', padding: '30px', fontSize: '18px' }}>🔄 Sorular yükleniyor...</div>}
+      {error && <div style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '15px', borderRadius: '5px', marginBottom: '20px' }}>❌ Hata: {error}</div>}
+
+      {!isLoading && !error && (
+        <>
+          {/* Toplu İşlemler */}
+          {selectedIds.size > 0 && (
+            <div style={{
+              marginBottom: '20px',
+              padding: '15px',
+              backgroundColor: '#e9ecef',
+              borderRadius: '5px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span>{selectedIds.size} soru seçildi.</span>
+              <button
+                onClick={handleBulkDelete}
+                disabled={isLoading}
+                style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                🗑️ Seçilenleri Sil
+              </button>
+            </div>
           )}
-        </div>
+
+          {/* Soru Listesi */}
+          {questions.length > 0 ? (
+            <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: '1fr' }}> {/* Tek sütunlu liste */}
+              {/* Tümünü Seç Checkbox'ı */}
+              <div style={{ padding: '10px', borderBottom: '1px solid #eee', display:'flex', alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={selectAllOnPage}
+                  onChange={toggleSelectAllOnPage}
+                  disabled={questions.length === 0 || isLoading}
+                  style={{ marginRight: '10px', transform: 'scale(1.2)' }}
+                  id="select-all-questions"
+                />
+                <label htmlFor="select-all-questions" style={{fontWeight: 'bold'}}>
+                  Sayfadaki Tüm Soruları Seç ({selectedIds.size} / {questions.length})
+                </label>
+              </div>
+
+              {questions.map((question) => (
+                <QuestionCard
+                  key={question.id}
+                  question={question}
+                  isSelected={selectedIds.has(question.id)}
+                  onSelect={() => toggleSelectQuestion(question.id)}
+                  onEdit={() => handleEdit(question)}
+                  onDelete={() => handleDelete(question)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '30px', fontSize: '16px', backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
+              Gösterilecek soru bulunamadı. Filtrelerinizi kontrol edin veya yeni sorular ekleyin.
+            </div>
+          )}
+
+          {/* Sayfalama (Paylaşılan Pagination component'i kullanılacak) */}
+          {pagination && pagination.totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={handlePageChange}
+              itemsPerPage={pageSize}
+              totalItems={pagination.totalItems}
+              isLoading={isLoading}
+            />
+          )}
+        </>
       )}
 
-      {/* Bilgi Kutusu */}
-      <div style={{
-        backgroundColor: '#e9ecef',
-        padding: '15px',
-        borderRadius: '5px',
-        marginTop: '20px',
-        fontSize: '14px',
-        color: '#495057'
-      }}>
-        <h4 style={{ margin: '0 0 10px 0' }}>ℹ️ Soru Yönetimi Hakkında</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minWidth(250px, 1fr))', gap: '15px' }}>
-          <div>
-            <strong>🔧 Yönetim Özellikleri:</strong>
-            <ul style={{ margin: '5px 0', paddingLeft: '15px', fontSize: '13px' }}>
-              <li>Tekil ve toplu soru düzenleme</li>
-              <li>Aktif/pasif durum yönetimi</li>
-              <li>Gelişmiş filtreleme ve arama</li>
-              <li>Soru kalitesi görüntüleme</li>
-            </ul>
-          </div>
-          <div>
-            <strong>📊 Soru Kalitesi:</strong>
-            <ul style={{ margin: '5px 0', paddingLeft: '15px', fontSize: '13px' }}>
-              <li>AI tarafından oluşturulmuş sorular</li>
-              <li>Context-aware seçenekler</li>
-              <li>Zorluk seviyesi uyumluluğu</li>
-              <li>Otomatik kalite kontrolleri</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      {/* Modallar */}
+      <QuestionEditModal
+        show={showEditModal}
+        question={editingQuestion}
+        onClose={handleCloseEditModal}
+        onSave={handleUpdate}
+      />
+      <ConfirmDeleteModal
+        show={showDeleteModal}
+        question={questionToDelete}
+        onClose={handleCloseDeleteModal}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 };

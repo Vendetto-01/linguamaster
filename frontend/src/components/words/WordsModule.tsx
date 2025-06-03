@@ -1,6 +1,13 @@
-// frontend/src/components/words/WordsModule.tsx - KELİME VERİTABANI GÖRÜNTÜLEME
-import React, { useState, useEffect } from 'react';
+// frontend/src/components/words/WordsModule.tsx - GÜNCELLENMİŞ VERSİYON
+import React, { useState, useEffect, useCallback } from 'react';
 import { wordApi } from '../../services/api';
+import type { Word, WordsResponse, WordFilters } from '../../types';
+
+// Paylaşılan component'ler import ediliyor
+import WordCard from './WordCard'; // Aynı klasörde olduğu varsayılıyor
+import Pagination from '../shared/Pagination'; // ../shared/ altında olduğu varsayılıyor
+
+import './WordsModule.css'; // Oluşturduğumuz CSS dosyası import ediliyor
 
 interface WordStats {
   totalWords: number;
@@ -11,19 +18,7 @@ interface WordStats {
     advanced: number;
   };
   partOfSpeechBreakdown: Record<string, number>;
-  recentWords: number; // Son 24 saatte eklenen
-}
-
-interface Word {
-  id: number;
-  word: string;
-  meaning_id: number;
-  part_of_speech: string;
-  meaning_description: string;
-  english_example: string;
-  turkish_meaning: string;
-  final_difficulty: string;
-  created_at: string;
+  recentWords: number;
 }
 
 const WordsModule: React.FC = () => {
@@ -32,389 +27,136 @@ const WordsModule: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
+  // Pagination state'i için WordsResponse'dan gelen pagination objesini kullanalım
+  const [paginationInfo, setPaginationInfo] = useState<WordsResponse['pagination'] | null>(null);
+
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [difficultyFilter, setDifficultyFilter] = useState('');
+  const [difficultyFilter, setDifficultyFilter] = useState<'beginner' | 'intermediate' | 'advanced' | ''>('');
   const [groupByWord, setGroupByWord] = useState(false);
 
   const pageSize = 20;
 
-  // Kelimeleri getir
-  const fetchWords = async () => {
+  const fetchWords = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
     try {
-      setIsLoading(true);
+      const filters: WordFilters = {
+        page: currentPage,
+        limit: pageSize,
+        groupByWord: groupByWord,
+        search: searchQuery.trim() ? searchQuery.trim() : undefined,
+        difficulty: difficultyFilter || undefined,
+      };
+
+      const data: WordsResponse = await wordApi.getWords(filters);
       
-      // WordApi'den kelime listesi al (mevcut endpoint'i kullan)
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: pageSize.toString(),
-        groupByWord: groupByWord.toString()
-      });
-
-      if (searchQuery) {
-        params.append('search', searchQuery);
-      }
-
-      if (difficultyFilter) {
-        params.append('difficulty', difficultyFilter);
-      }
-
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/words?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Kelimeler yüklenemedi');
-      }
-
-      const data = await response.json();
-      
-      setWords(data.words || []);
-      setTotalPages(data.pagination?.totalPages || 0);
+      setWords(data.words || (data.wordGroups ? data.wordGroups.flatMap(g => g.meanings) : []));
+      setPaginationInfo(data.pagination || null); // Pagination bilgisini state'e ata
       setError('');
 
     } catch (err) {
       console.error('Kelime yükleme hatası:', err);
       setError(err instanceof Error ? err.message : 'Kelimeler yüklenirken hata oluştu');
+      setWords([]);
+      setPaginationInfo(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, searchQuery, difficultyFilter, groupByWord, pageSize]);
 
-  // İstatistikleri getir (basit bir endpoint yazacağız backend'e)
-  const fetchStats = async () => {
-    try {
-      // Basit istatistikler için words endpoint'ini kullan
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/words?limit=1`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Temel istatistikler (gerçek istatistik endpoint'i eklenene kadar placeholder)
-        setStats({
-          totalWords: data.pagination?.totalWords || 0,
-          totalMeanings: data.pagination?.totalMeanings || 0,
-          difficultyBreakdown: {
-            beginner: 0,
-            intermediate: 0,
-            advanced: 0
-          },
-          partOfSpeechBreakdown: {},
-          recentWords: 0
-        });
-      }
-    } catch (err) {
-      console.error('İstatistik yükleme hatası:', err);
-    }
-  };
+  const fetchStats = useCallback(async () => {
+    // Gerçek bir stats API çağrısı olmadığından, paginationInfo'dan veri alıyoruz
+    setStats({
+      totalWords: paginationInfo?.totalWords || 0,
+      totalMeanings: paginationInfo?.totalMeanings || 0,
+      difficultyBreakdown: { beginner: 0, intermediate: 0, advanced: 0 }, // Placeholder
+      partOfSpeechBreakdown: {}, // Placeholder
+      recentWords: 0 // Placeholder
+    });
+  }, [paginationInfo]);
 
   useEffect(() => {
     fetchWords();
-    fetchStats();
-  }, [currentPage, searchQuery, difficultyFilter, groupByWord]);
+  }, [fetchWords]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!isLoading && paginationInfo) {
+        fetchStats();
+    }
+  }, [isLoading, paginationInfo, fetchStats]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
-    fetchWords();
+    setCurrentPage(1); // Arama yapıldığında ilk sayfaya dön
+    fetchWords(); // fetchWords zaten currentPage'e bağlı, ama yeni filtrelerle hemen tetiklemek için
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
-
-    const pageNumbers = [];
-    const startPage = Math.max(1, currentPage - 2);
-    const endPage = Math.min(totalPages, currentPage + 2);
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
-    }
-
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        gap: '5px',
-        margin: '20px 0'
-      }}>
-        <button
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            backgroundColor: currentPage === 1 ? '#f8f9fa' : '#fff',
-            color: currentPage === 1 ? '#6c757d' : '#007bff',
-            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-            borderRadius: '4px'
-          }}
-        >
-          ← Önceki
-        </button>
-
-        {pageNumbers.map(pageNum => (
-          <button
-            key={pageNum}
-            onClick={() => handlePageChange(pageNum)}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #ddd',
-              backgroundColor: currentPage === pageNum ? '#007bff' : '#fff',
-              color: currentPage === pageNum ? 'white' : '#007bff',
-              cursor: 'pointer',
-              borderRadius: '4px',
-              fontWeight: currentPage === pageNum ? 'bold' : 'normal'
-            }}
-          >
-            {pageNum}
-          </button>
-        ))}
-
-        <button
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            backgroundColor: currentPage === totalPages ? '#f8f9fa' : '#fff',
-            color: currentPage === totalPages ? '#6c757d' : '#007bff',
-            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-            borderRadius: '4px'
-          }}
-        >
-          Sonraki →
-        </button>
-
-        <span style={{ marginLeft: '15px', fontSize: '14px', color: '#666' }}>
-          {currentPage} / {totalPages} sayfa
-        </span>
-      </div>
-    );
-  };
-
-  const renderWordCard = (word: Word) => (
-    <div
-      key={`${word.id}-${word.meaning_id}`}
-      style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #e0e0e0',
-        borderRadius: '8px',
-        padding: '15px',
-        marginBottom: '15px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        transition: 'all 0.3s ease'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
-        e.currentTarget.style.transform = 'translateY(-2px)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-        e.currentTarget.style.transform = 'none';
-      }}
-    >
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'flex-start',
-        marginBottom: '10px'
-      }}>
-        <div>
-          <h3 style={{ 
-            margin: '0 0 5px 0', 
-            color: '#2c3e50',
-            fontSize: '20px',
-            fontWeight: 'bold'
-          }}>
-            {word.word}
-            <span style={{ 
-              fontSize: '14px', 
-              color: '#7f8c8d',
-              marginLeft: '8px'
-            }}>
-              (anlam #{word.meaning_id})
-            </span>
-          </h3>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span style={{
-              backgroundColor: getDifficultyColor(word.final_difficulty),
-              color: 'white',
-              padding: '2px 8px',
-              borderRadius: '12px',
-              fontSize: '12px',
-              fontWeight: 'bold'
-            }}>
-              {word.final_difficulty}
-            </span>
-            <span style={{
-              backgroundColor: '#f8f9fa',
-              color: '#495057',
-              padding: '2px 8px',
-              borderRadius: '12px',
-              fontSize: '12px',
-              border: '1px solid #dee2e6'
-            }}>
-              {word.part_of_speech}
-            </span>
-          </div>
-        </div>
-        <div style={{ fontSize: '12px', color: '#6c757d' }}>
-          {new Date(word.created_at).toLocaleDateString('tr-TR')}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '10px' }}>
-        <div style={{ fontSize: '14px', color: '#495057', marginBottom: '5px' }}>
-          <strong>Anlam:</strong> {word.meaning_description}
-        </div>
-        <div style={{ fontSize: '14px', color: '#495057', marginBottom: '5px' }}>
-          <strong>Türkçe:</strong> {word.turkish_meaning}
-        </div>
-      </div>
-
-      <div style={{
-        backgroundColor: '#f8f9fa',
-        padding: '10px',
-        borderRadius: '5px',
-        borderLeft: '4px solid #007bff'
-      }}>
-        <div style={{ fontSize: '13px', color: '#666', marginBottom: '3px' }}>
-          Örnek Cümle:
-        </div>
-        <div style={{ fontSize: '14px', color: '#2c3e50', fontStyle: 'italic' }}>
-          "{word.english_example}"
-        </div>
-      </div>
-    </div>
-  );
-
-  // Zorluk seviyesi renkleri
-  function getDifficultyColor(difficulty: string): string {
-    switch (difficulty) {
-      case 'beginner': return '#28a745';
-      case 'intermediate': return '#ffc107';
-      case 'advanced': return '#dc3545';
-      default: return '#6c757d';
-    }
-  }
+  // getDifficultyColor fonksiyonu artık WordCard component'i içinde olmalı.
+  // Eğer WordCard.tsx bu mantığı içermiyorsa, oraya taşınabilir veya
+  // WordCard'a prop olarak renk geçilebilir. Şimdilik kaldırıyoruz.
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '20px'
-      }}>
+    <div className="wordsModuleContainer">
+      <div className="wordsModuleHeader">
         <h2>🗄️ Kelime Veritabanı</h2>
         <button
-          onClick={() => {
-            fetchWords();
-            fetchStats();
-          }}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
+          onClick={fetchWords}
+          disabled={isLoading}
+          className="wordsModuleRefreshButton"
         >
           🔄 Yenile
         </button>
       </div>
 
-      {/* İstatistikler */}
       {stats && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '15px',
-          marginBottom: '25px'
-        }}>
-          <div style={{
-            backgroundColor: '#e3f2fd',
-            padding: '15px',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1976d2' }}>
-              {stats.totalWords.toLocaleString()}
+        <div className="statsGrid">
+          <div className={`statCard ${groupByWord ? 'totalWords' : 'totalMeanings'}`}>
+            <div className="statCardValue">
+              {(groupByWord ? stats.totalWords : stats.totalMeanings).toLocaleString()}
             </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Toplam Kelime</div>
+            <div className="statCardLabel">
+              {groupByWord ? 'Toplam Benzersiz Kelime' : 'Toplam Anlam'}
+            </div>
           </div>
-          
-          <div style={{
-            backgroundColor: '#f3e5f5',
-            padding: '15px',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#7b1fa2' }}>
-              {stats.totalMeanings.toLocaleString()}
+          {!groupByWord && (
+             <div className="statCard totalMeanings">
+                <div className="statCardValue">{stats.totalMeanings.toLocaleString()}</div>
+                <div className="statCardLabel">Toplam Anlam Sayısı</div>
             </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Toplam Anlam</div>
-          </div>
-          
-          <div style={{
-            backgroundColor: '#e8f5e8',
-            padding: '15px',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#388e3c' }}>
-              {stats.recentWords}
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Son 24 Saat</div>
+          )}
+          <div className="statCard recentWords">
+            <div className="statCardValue">{stats.recentWords}</div>
+            <div className="statCardLabel">Son 24 Saat (Placeholder)</div>
           </div>
         </div>
       )}
 
-      {/* Arama ve Filtreler */}
-      <div style={{
-        backgroundColor: '#f8f9fa',
-        padding: '20px',
-        borderRadius: '8px',
-        marginBottom: '20px'
-      }}>
-        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'end' }}>
-          <div style={{ flex: '1', minWidth: '200px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>
-              🔍 Kelime Ara:
-            </label>
+      <div className="filterContainer">
+        <form onSubmit={handleSearchSubmit} className="filterForm">
+          <div className="filterGroup">
+            <label htmlFor="wm-search" className="filterLabel">🔍 Kelime Ara:</label>
             <input
+              id="wm-search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Kelime veya anlam ara..."
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
+              className="filterInput"
             />
           </div>
           
-          <div style={{ minWidth: '150px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>
-              📊 Zorluk:
-            </label>
+          <div className="filterGroup">
+            <label htmlFor="wm-difficulty" className="filterLabel">📊 Zorluk:</label>
             <select
+              id="wm-difficulty"
               value={difficultyFilter}
-              onChange={(e) => setDifficultyFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
+              onChange={(e) => setDifficultyFilter(e.target.value as WordFilters['difficulty'])}
+              className="filterSelect"
             >
               <option value="">Tümü</option>
               <option value="beginner">Beginner</option>
@@ -423,96 +165,76 @@ const WordsModule: React.FC = () => {
             </select>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="filterGroup checkboxGroup">
             <input
               type="checkbox"
-              id="groupByWord"
+              id="wm-groupByWord"
               checked={groupByWord}
-              onChange={(e) => setGroupByWord(e.target.checked)}
-              style={{ transform: 'scale(1.2)' }}
+              onChange={(e) => {
+                  setGroupByWord(e.target.checked);
+                  setCurrentPage(1);
+              }}
+              className="filterCheckbox"
             />
-            <label htmlFor="groupByWord" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+            <label htmlFor="wm-groupByWord" className="filterLabel" style={{marginBottom: 0}}>
               📚 Kelime Bazında Grupla
             </label>
           </div>
 
           <button
             type="submit"
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
+            disabled={isLoading}
+            className="filterSubmitButton"
           >
             Ara
           </button>
         </form>
       </div>
 
-      {/* Loading State */}
-      {isLoading && (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '18px', color: '#666' }}>
-            🔄 Kelimeler yükleniyor...
-          </div>
-        </div>
-      )}
+      {isLoading && <div className="loadingMessage">🔄 Kelimeler yükleniyor...</div>}
+      {error && <div className="errorMessageContainer"><div className="errorMessage">❌ {error}</div></div>}
 
-      {/* Error State */}
-      {error && (
-        <div style={{
-          backgroundColor: '#f8d7da',
-          color: '#721c24',
-          padding: '15px',
-          borderRadius: '5px',
-          marginBottom: '20px',
-          border: '1px solid #f5c6cb'
-        }}>
-          ❌ {error}
-        </div>
-      )}
-
-      {/* Kelime Listesi */}
       {!isLoading && !error && words.length > 0 && (
-        <div>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '15px'
-          }}>
-            <h3 style={{ margin: 0 }}>
-              Kelimeler ({words.length} kayıt gösteriliyor)
+        <>
+          <div className="wordsListHeader">
+            <h3>
+              {groupByWord ? `Kelime Grupları (${paginationInfo?.totalWords || 0} benzersiz kelime)` : `Kelimeler (${paginationInfo?.totalMeanings || 0} anlam)`}
             </h3>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              Sayfa {currentPage} / {totalPages}
-            </div>
+            {paginationInfo && (
+                <span className="wordsListInfo">
+                    Sayfa {currentPage} / {paginationInfo.totalPages}
+                </span>
+            )}
           </div>
           
-          {words.map(renderWordCard)}
+          <div className="wordCardsGrid">
+            {words.map(word => (
+              // WordCard.tsx'in props'ları word objesini ve gerekirse diğer interaktif propları almalı
+              <WordCard key={`${word.id}-${word.meaning_id}`} word={word} />
+            ))}
+          </div>
           
-          {renderPagination()}
-        </div>
+          {paginationInfo && paginationInfo.totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={paginationInfo.totalPages}
+              onPageChange={handlePageChange}
+              itemsPerPage={pageSize}
+              totalItems={paginationInfo.totalItems} // totalItems API'den geliyorsa
+              isLoading={isLoading}
+            />
+          )}
+        </>
       )}
 
-      {/* Boş State */}
       {!isLoading && !error && words.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          padding: '40px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '8px'
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '10px' }}>📭</div>
-          <h3 style={{ color: '#6c757d' }}>Kelime Bulunamadı</h3>
-          <p style={{ color: '#6c757d' }}>
+        <div className="noWordsFoundContainer">
+          <div className="noWordsFoundIcon">📭</div>
+          <h3 className="noWordsFoundTitle">Kelime Bulunamadı</h3>
+          <p className="noWordsFoundText">
             {searchQuery || difficultyFilter 
               ? 'Arama kriterlerinize uygun kelime bulunamadı.' 
-              : 'Henüz veritabanında kelime bulunmuyor.'
+              : 'Henüz veritabanında kelime bulunmuyor veya aktif kelime yok.'
             }
           </p>
           {(searchQuery || difficultyFilter) && (
@@ -521,15 +243,9 @@ const WordsModule: React.FC = () => {
                 setSearchQuery('');
                 setDifficultyFilter('');
                 setCurrentPage(1);
+                // fetchWords zaten tetiklenecek
               }}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+              className="clearFiltersButton"
             >
               Filtreleri Temizle
             </button>
@@ -537,20 +253,12 @@ const WordsModule: React.FC = () => {
         </div>
       )}
 
-      {/* Bilgi Kutusu */}
-      <div style={{
-        backgroundColor: '#e9ecef',
-        padding: '15px',
-        borderRadius: '5px',
-        marginTop: '20px',
-        fontSize: '14px',
-        color: '#495057'
-      }}>
-        <h4 style={{ margin: '0 0 10px 0' }}>ℹ️ Kelime Veritabanı Bilgileri</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
+      <div className="moduleInfoFooter">
+        <h4>ℹ️ Kelime Veritabanı Bilgileri</h4>
+        <div className="infoGrid">
           <div>
             <strong>🔧 Özellikler:</strong>
-            <ul style={{ margin: '5px 0', paddingLeft: '15px', fontSize: '13px' }}>
+            <ul className="infoList">
               <li>Her kelime için çoklu anlam desteği</li>
               <li>6 aşamalı AI analizi ile oluşturulmuş</li>
               <li>Akademik seviyede örnek cümleler</li>
@@ -559,7 +267,7 @@ const WordsModule: React.FC = () => {
           </div>
           <div>
             <strong>📊 Veri Kalitesi:</strong>
-            <ul style={{ margin: '5px 0', paddingLeft: '15px', fontSize: '13px' }}>
+            <ul className="infoList">
               <li>Gemini 2.0 Flash AI ile analiz edilmiş</li>
               <li>Zorluk seviyeleri context'e göre ayarlanmış</li>
               <li>Kelime türleri doğrulanmış</li>

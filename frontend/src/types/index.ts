@@ -1,181 +1,102 @@
-// frontend/src/types/index.ts - TEMİZLENMİŞ VERSİYON
+// frontend/src/types/index.ts - GÜNCELLENMİŞ VERSİYON
 
-// Base API response wrapper
-export interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data: T;
-}
+// Mevcut tipleriniz burada devam edecek...
+// ... (yukarıdaki existing types)
 
-// Pending word (queue) types
-export interface PendingWord {
+// YENİ EKLENEN TİPLER (Kelimeler ve Kelime API Yanıtı için) - Önceki adımlardan
+export interface Word {
   id: number;
   word: string;
-  upload_batch_id: string;
-  status: 'pending' | 'processing' | 'failed';
-  retry_count: number;
-  error_message?: string;
+  meaning_id: number;
+  part_of_speech: string;
+  meaning_description: string;
+  english_example: string;
+  turkish_meaning: string;
+  turkish_sentence?: string;
+  initial_difficulty?: string;
+  final_difficulty: string;
+  difficulty_reasoning?: string;
+  analysis_method?: string;
+  source?: string;
+  times_shown?: number;
+  times_correct?: number;
+  is_active?: boolean;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
-// Processing log
-export interface WordProcessingLog {
-  id: number;
-  word: string;
-  status: 'success' | 'failed' | 'skipped';
-  processing_time_ms: number;
-  error_message?: string;
-  gemini_response?: any;
-  meanings_added: number;
-  processed_at: string;
-}
-
-// File upload response
-export interface FileUploadResponse {
-  message: string;
-  results: {
-    fileName: string;
-    batchId: string;
-    totalWords: number;
-    queued: number;
-    duplicates: number;
-    failed: number;
-  };
-  status: string;
-  nextStep: string;
-}
-
-// Queue status types
-export interface QueueStatus {
-  batchId: string;
-  pending: number;
-  processing: number;
-  processed: number;
-  failed: number;
-  status: 'processing' | 'completed';
-  lastUpdate: string;
-}
-
-// Processor Stats
-export interface ProcessorStats {
-  isProcessing: boolean;
-  processedCount: number;
-  errorCount: number;
-  startTime: string | null;
-  elapsedTime: number;
-  analysisMethod: string;
-}
-
-export interface QueueStats {
-  totalPendingWords: number;
-  totalProcessingWords: number;
-  totalFailedWords: number;
-  activeBatches: number;
-  oldestPendingWord: {
+export interface WordsResponse {
+  words: Word[];
+  wordGroups?: Array<{
     word: string;
-    created_at: string;
-  } | null;
-  isQueueActive: boolean;
-  processorStats: ProcessorStats;
-  lastUpdate: string;
+    meanings: Word[];
+    totalMeanings: number;
+    difficultyRange: {
+        initial: string;
+        final: string;
+        min?: string;
+        max?: string;
+    };
+    partOfSpeechSummary?: string[];
+    analysisMethod?: string;
+    createdAt?: string;
+  }>;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalWords: number;
+    totalMeanings: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
-// Component props types
-export interface FileUploadProps {
-  onFileUploaded: (result: FileUploadResponse) => void;
+export interface WordFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced' | '';
+  partOfSpeech?: string;
+  groupByWord?: boolean;
+  difficultyType?: 'initial' | 'final';
 }
 
-export interface QueueStatusProps {
-  batchId?: string;
-  autoRefresh?: boolean;
-  refreshInterval?: number;
+
+// --- YENİ EKLENEN MODÜL VE SEKME TİPLERİ ---
+export type ModuleType = 'words' | 'questions';
+
+export type WordsModuleTabId = 'file' | 'queue' | 'database'; // Daha spesifik bir isim verildi (WordsTabType yerine)
+
+export type QuestionsModuleTabId = 'selection' | 'generation' | 'management'; // Daha spesifik bir isim verildi (QuestionsTabType yerine)
+
+// App.tsx'deki ModuleConfig ve WordsTabConfig arayüzleri de buraya taşınabilir
+// veya config dosyasında kalabilirler. Şimdilik sadece ID tiplerini taşıdık.
+// Eğer config objelerinin tipleri de global olacaksa, buraya almak mantıklı olur:
+
+export interface ModuleConfigApp { // appConfig.ts'deki ModuleConfig ile karışmaması için farklı bir isim
+  id: ModuleType;
+  title: string;
+  icon: string;
+  description:string;
+  color: string;
 }
 
-// Processing result types
-export interface ProcessingResult {
-  status: 'success' | 'failed' | 'queue_empty';
-  word?: string;
-  addedDefinitions?: number;
-  duplicateDefinitions?: number;
-  totalDefinitions?: number;
-  processingTime?: number;
-  reason?: string;
-  retryCount?: number;
-}
-
-// Upload progress tracking
-export interface UploadProgress {
-  current: number;
-  total: number;
-  percentage: number;
-  currentItem?: string;
-  stage: 'reading' | 'uploading' | 'queueing' | 'complete' | 'error';
-  message: string;
-}
-
-// Form validation types
-export interface ValidationResult {
-  isValid: boolean;
-  error: string;
-  words: string[];
-}
-
-// UI State types
-export interface LoadingState {
-  isLoading: boolean;
-  message?: string;
-}
-
-export interface ErrorState {
-  hasError: boolean;
-  error?: string;
-}
-
-export interface ComponentState extends LoadingState, ErrorState {
-  data?: any;
-}
-
-// Theme/UI types
-export interface TabConfig {
-  id: 'file' | 'queue'; // Sadece bu iki tab kaldı
+export interface WordsTabConfigApp { // appConfig.ts'deki WordsTabConfig ile karışmaması için farklı bir isim
+  id: WordsModuleTabId;
   label: string;
   icon: string;
-  component: React.ComponentType<any>;
+  description: string;
 }
 
-// Event handler types
-export type ProgressEventHandler = (progress: UploadProgress) => void;
-export type ErrorEventHandler = (error: string) => void;
-export type SuccessEventHandler = (result: any) => void;
-
-// Utility types
-export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
-export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type AnalysisMethod = 'step-by-step' | 'legacy';
-
-// Configuration types
-export interface AppConfig {
-  apiBaseUrl: string;
-  maxWordsPerBatch: number;
-  maxFileSize: number;
-  supportedFileTypes: string[];
-  refreshIntervals: {
-    queueStats: number;
-    processorStats: number;
-  };
-  analysisConfig: {
-    maxMeaningsPerWord: number;
-    stepTimeout: number;
-    enableStepByStep: boolean;
-  };
+// QuestionsTabConfig için de benzer bir arayüz (QuestionsModule içinde tanımlıysa oradan buraya gelebilir)
+export interface QuestionsTabConfigApp {
+    id: QuestionsModuleTabId;
+    label: string;
+    icon: string;
+    // QuestionsModule'ün beklediği diğer proplar eklenebilir
 }
 
-// Environment specific types
-export interface Environment {
-  NODE_ENV: 'development' | 'production' | 'test';
-  REACT_APP_BACKEND_URL?: string;
-  REACT_APP_MAX_UPLOAD_SIZE?: string;
-}
 
-export default {};
+// --- MEVCUT TİPLERİNİZİN SONU ---
+
+export default {}; // Eğer dosyanızda default export yoksa ve eklemek isterseniz

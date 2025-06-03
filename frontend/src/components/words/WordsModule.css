@@ -1,0 +1,256 @@
+/* frontend/src/components/words/WordsModule.css */
+.wordsModuleContainer {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.wordsModuleHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.wordsModuleHeader h2 {
+  margin: 0;
+}
+
+.wordsModuleRefreshButton {
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.wordsModuleRefreshButton:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.wordsModuleRefreshButton:not(:disabled):hover {
+  background-color: #0056b3;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.statCard {
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  color: white;
+}
+
+.statCard.totalMeanings { background-color: #17a2b8; } /* Info */
+.statCard.totalWords { background-color: #007bff; } /* Primary */
+.statCard.recentWords { background-color: #28a745; } /* Success - placeholder */
+/* Diğer stat kartları için renkler eklenebilir */
+
+.statCardValue {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.statCardLabel {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.filterContainer {
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.filterForm {
+  display: flex;
+  gap: 15px; /* Artırıldı */
+  flex-wrap: wrap;
+  align-items: flex-end; /* Hizalama iyileştirildi */
+}
+
+.filterGroup {
+  flex: 1;
+  min-width: 180px; /* Biraz daha geniş */
+}
+
+.filterGroup.checkboxGroup {
+  flex: initial; /* Checkbox grubunun esnemesini engelle */
+  min-width: auto; /* Min genişliği sıfırla */
+  align-self: center; /* Dikeyde ortala */
+  padding-top: 20px; /* Üstteki elemanlarla hizalamak için padding */
+}
+
+
+.filterLabel {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #495057;
+}
+
+.filterInput,
+.filterSelect {
+  width: 100%;
+  padding: 10px 12px; /* Padding artırıldı */
+  border: 1px solid #ced4da; /* Daha belirgin border */
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box; /* Padding ve border'ın genişliği etkilememesi için */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.filterInput:focus,
+.filterSelect:focus {
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+
+.filterCheckbox {
+  transform: scale(1.2);
+  margin-right: 8px;
+}
+
+.filterSubmitButton {
+  padding: 10px 18px; /* Padding artırıldı */
+  background-color: #007bff; /* App.css ile uyumlu */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+.filterSubmitButton:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+.filterSubmitButton:not(:disabled):hover {
+  background-color: #0056b3;
+}
+
+
+.loadingMessage, .errorMessageContainer /* Hata mesajları için ortak stil */ {
+  text-align: center;
+  padding: 30px;
+  font-size: 18px;
+  color: #6c757d;
+}
+
+.errorMessage { /* spesifik hata mesajı stili */
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  border: 1px solid #f5c6cb;
+}
+
+.wordsListHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.wordsListHeader h3 {
+  margin: 0;
+  color: #343a40;
+}
+
+.wordsListInfo {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.noWordsFoundContainer {
+  text-align: center;
+  padding: 40px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.noWordsFoundIcon {
+  font-size: 48px;
+  margin-bottom: 10px;
+  color: #6c757d;
+}
+
+.noWordsFoundTitle {
+  color: #495057; /* Biraz daha koyu */
+  margin-bottom: 8px;
+}
+
+.noWordsFoundText {
+  color: #6c757d;
+  margin-bottom: 15px;
+}
+
+.clearFiltersButton {
+  padding: 10px 18px;
+  background-color: #28a745; /* Yeşil renk */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.clearFiltersButton:hover {
+  background-color: #1e7e34;
+}
+
+.moduleInfoFooter {
+  background-color: #e9ecef;
+  padding: 20px; /* Padding artırıldı */
+  border-radius: 8px; /* Daha yuvarlak */
+  margin-top: 30px; /* Üst boşluk artırıldı */
+  font-size: 14px;
+  color: #495057;
+}
+
+.moduleInfoFooter h4 {
+  margin-top: 0;
+  margin-bottom: 15px; /* Başlık alt boşluğu artırıldı */
+  color: #343a40;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Min genişlik ayarlandı */
+  gap: 20px;
+}
+
+.infoList {
+  margin: 5px 0 0 0; /* Üst margin kaldırıldı */
+  padding-left: 18px; /* Sol padding ayarlandı */
+  font-size: 13px;
+  list-style-type: disc; /* Liste stili */
+}
+
+.infoList li {
+  margin-bottom: 5px; /* Liste elemanları arası boşluk */
+}
+
+/* WordCard ve Pagination component'leri kendi stillerine sahip olmalı,
+   ancak WordsModule içinde gerekirse ek sarmalayıcı stiller eklenebilir.
+   Örneğin, kelime kartlarının listelendiği alan için: */
+.wordCardsGrid {
+  display: grid;
+  /* İstenirse grid-template-columns ile sütun sayısı ayarlanabilir, şimdilik tek sütun */
+  gap: 15px; /* Kartlar arası boşluk */
+}

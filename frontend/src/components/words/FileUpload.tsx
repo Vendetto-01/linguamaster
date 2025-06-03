@@ -1,21 +1,21 @@
-// frontend/src/components/FileUpload.tsx - SADELEŞTİRİLMİŞ VERSİYON
-import React, { useState, useRef } from 'react';
+// frontend/src/components/words/FileUpload.tsx - GÜNCELLENMİŞ VERSİYON
+import React, { useState, useRef, useCallback } from 'react';
 import { wordApi } from '../../services/api';
-import { FileUploadProps, FileUploadResponse, UploadProgress } from '../types';
+import { FileUploadProps, FileUploadResponse, UploadProgress } from '../../types';
+import ProgressDisplay from '../shared/ProgressDisplay';
+import DropZone from '../shared/DropZone'; // DropZone component'i import edildi
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
+  // isDragOver state'i DropZone component'i içine taşındı.
   const [error, setError] = useState<string>('');
   const [result, setResult] = useState<FileUploadResponse | null>(null);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Dosya içeriğini okuma
   const readFileContent = (file: File): Promise<string[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
       reader.onload = (e) => {
         try {
           setProgress({
@@ -25,24 +25,18 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
             stage: 'reading',
             message: 'Dosya içeriği okunuyor...'
           });
-
           const content = e.target?.result as string;
-          
-          // Her satırı bir kelime olarak ayır
           const words = content
             .split('\n')
             .map(line => line.trim())
             .filter(line => line.length > 0)
-            .filter(line => /^[a-zA-Z\s-']+$/.test(line)); // Sadece İngilizce karakterler
-            
+            .filter(line => /^[a-zA-Z\s-']+$/.test(line)); 
           resolve(words);
         } catch (err) {
           reject(new Error('Dosya okunamadı'));
         }
       };
-      
       reader.onerror = () => reject(new Error('Dosya okuma hatası'));
-      
       setProgress({
         current: 25,
         total: 100,
@@ -50,37 +44,28 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         stage: 'reading',
         message: 'Dosya okunuyor...'
       });
-      
       reader.readAsText(file, 'utf-8');
     });
   };
 
-  // Dosya yükleme
-  const uploadFile = async (file: File) => {
+  const mainUploadFileLogic = useCallback(async (file: File) => {
     setIsUploading(true);
-    setError('');
+    setError(''); // Hata mesajını her yükleme öncesi temizle
     setResult(null);
     setProgress(null);
 
     try {
       console.log('📖 Dosya okunuyor:', file.name);
-      
-      // Dosya boyutu kontrolü
       if (file.size > 10 * 1024 * 1024) { // 10MB
         throw new Error('Dosya boyutu 10MB\'dan büyük olamaz');
       }
-      
-      // Dosya içeriğini oku
       const words = await readFileContent(file);
-      
       if (words.length === 0) {
         throw new Error('Dosyada geçerli kelime bulunamadı');
       }
-
       if (words.length > 50000) {
         throw new Error('Maksimum 50.000 kelime yükleyebilirsiniz');
       }
-
       setProgress({
         current: 75,
         total: 100,
@@ -88,12 +73,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         stage: 'uploading',
         message: `${words.length} kelime sunucuya gönderiliyor...`
       });
-
       console.log(`📊 ${words.length} kelime bulundu, sunucuya gönderiliyor...`);
-
-      // Backend'e gönder
       const uploadResult = await wordApi.uploadFile(words, file.name);
-      
       setProgress({
         current: 100,
         total: 100,
@@ -101,15 +82,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         stage: 'complete',
         message: 'Yükleme tamamlandı!'
       });
-
       console.log('✅ Upload başarılı:', uploadResult);
-      
       setResult(uploadResult);
       onFileUploaded(uploadResult);
-
     } catch (err) {
       console.error('❌ Upload hatası:', err);
-      setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
+      const errorMessage = err instanceof Error ? err.message : 'Bilinmeyen bir yükleme hatası oluştu';
+      setError(errorMessage); // Hata state'ini güncelle
       setProgress({
         current: 0,
         total: 100,
@@ -120,80 +99,53 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [onFileUploaded]);
 
-  // File input change handler
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  // Dosya input'undan seçildiğinde
+  const handleFileSelectFromInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      uploadFile(file);
-    }
-  };
-
-  // Drag & Drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      // Sadece text dosyalarını kabul et
+      // Dosya tipi kontrolü (DropZone içindeki validator ile benzer olmalı)
       if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-        uploadFile(file);
+        setError(''); // Hata yoksa temizle
+        mainUploadFileLogic(file);
       } else {
-        setError('Sadece .txt dosyaları desteklenir');
+        setError('Sadece .txt dosyaları desteklenir. Lütfen geçerli bir dosya seçin.');
+        // Input değerini sıfırla ki aynı "hatalı" dosya tekrar seçilebilsin (ve onChange tetiklensin)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
       }
     }
   };
+  
+  // DropZone'dan dosya geldiğinde
+  const handleFileAcceptedFromDropZone = useCallback((file: File) => {
+      // DropZone zaten temel .txt kontrolünü yapmış olmalı (varsayılan validator ile)
+      // Burada ek kontroller yapılabilir veya direkt yükleme başlatılabilir.
+      setError(''); // DropZone'dan geçerli dosya geldiyse hatayı temizle
+      mainUploadFileLogic(file);
+  }, [mainUploadFileLogic]);
 
-  // Browse button click
-  const handleBrowseClick = () => {
+
+  const handleBrowseClick = useCallback(() => {
     fileInputRef.current?.click();
+  }, []);
+
+  // DropZone için özel validator (isteğe bağlı, DropZone kendi default'una sahip)
+  const customFileValidator = (file: File): boolean => {
+    const isValid = file.type === 'text/plain' || file.name.endsWith('.txt');
+    if (!isValid) {
+      // Bu hata DropZone içinde gösterilecek, FileUpload'ın ana error state'ini etkilemez.
+      // Ancak istenirse setError ile ana hata da set edilebilir.
+      console.warn("DropZone validator: Geçersiz dosya türü - ", file.name);
+    }
+    return isValid;
   };
 
-  // Progress bar component
-  const ProgressBar = () => {
-    if (!progress) return null;
 
-    return (
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ 
-          marginBottom: '10px', 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span style={{ fontSize: '14px', color: '#666' }}>{progress.message}</span>
-          <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{progress.percentage}%</span>
-        </div>
-        <div style={{
-          width: '100%',
-          height: '8px',
-          backgroundColor: '#f0f0f0',
-          borderRadius: '4px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            width: `${progress.percentage}%`,
-            height: '100%',
-            backgroundColor: progress.stage === 'error' ? '#dc3545' : 
-                           progress.stage === 'complete' ? '#28a745' : '#007bff',
-            transition: 'width 0.3s ease'
-          }} />
-        </div>
-      </div>
-    );
-  };
+  // handleDragOver, handleDragLeave, handleDrop fonksiyonları DropZone'a taşındı.
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
@@ -202,88 +154,65 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         Kelimeler queue'ya eklenir ve arka planda <strong>Gemini 2.0 Flash</strong> ile 6 aşamalı analiz edilir
       </p>
       
-      {/* Progress Bar */}
-      <ProgressBar />
+      {progress && (
+        <ProgressDisplay
+          progress={{
+            ...progress,
+            successful: 0, 
+            failed: 0,     
+            timeElapsed: 0 
+          }}
+          title="Dosya Yükleme Süreci"
+          showStats={false}
+          variant="compact"
+        />
+      )}
       
-      {/* Drop Zone */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        style={{
-          border: `2px dashed ${isDragOver ? '#007bff' : '#ddd'}`,
-          borderRadius: '10px',
-          padding: '40px',
-          textAlign: 'center',
-          backgroundColor: isDragOver ? '#f8f9fa' : '#fafafa',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          marginBottom: '20px'
-        }}
-        onClick={handleBrowseClick}
-      >
-        <div style={{ fontSize: '48px', marginBottom: '10px' }}>
-          {isUploading ? '⏳' : '📄'}
-        </div>
-        
-        {isUploading ? (
-          <div>
-            <div style={{ fontSize: '18px', color: '#007bff' }}>
-              🔄 Dosya işleniyor...
-            </div>
-            <div style={{ fontSize: '14px', color: '#666', marginTop: '5px' }}>
-              Lütfen bekleyin
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div style={{ fontSize: '18px', marginBottom: '10px' }}>
-              .txt dosyanızı sürükleyip bırakın
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              veya <strong>tıklayarak dosya seçin</strong>
-            </div>
-            <div style={{ fontSize: '12px', color: '#999', marginTop: '10px' }}>
-              Her satırda bir kelime • Maksimum 50.000 kelime • Sadece İngilizce karakterler
-            </div>
-          </div>
-        )}
-      </div>
+      {/* DropZone component'i kullanılıyor */}
+      <DropZone
+        onFileAccepted={handleFileAcceptedFromDropZone}
+        onBrowseClick={handleBrowseClick}
+        disabled={isUploading}
+        // fileValidator={customFileValidator} // İsterseniz özel validator'unuzu buradan geçebilirsiniz
+        // DropZone içindeki varsayılan metinleri kullanıyoruz, isterseniz override edebilirsiniz:
+        // mainText="Sürükle bırak veya tıkla"
+        // subText=".txt dosyaları kabul edilir"
+        // browseButtonText="dosya ara"
+      />
 
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt"
-        onChange={handleFileSelect}
+        accept=".txt,text/plain" // DropZone'daki accept ile tutarlı olmalı
+        onChange={handleFileSelectFromInput}
         style={{ display: 'none' }}
+        disabled={isUploading}
       />
 
-      {/* Error Message */}
-      {error && (
+      {error && !isUploading && ( // Sadece yükleme yokken ana hatayı göster
         <div style={{
           color: '#dc3545',
           backgroundColor: '#f8d7da',
           padding: '15px',
           borderRadius: '5px',
           marginBottom: '20px',
+          marginTop: '15px', // DropZone sonrası biraz boşluk
           border: '1px solid #f5c6cb'
         }}>
           ❌ {error}
         </div>
       )}
 
-      {/* Success Result */}
       {result && (
         <div style={{
           backgroundColor: '#d4edda',
           border: '1px solid #c3e6cb',
           borderRadius: '5px',
           padding: '20px',
+          marginTop: '20px', // DropZone veya hata sonrası boşluk
           marginBottom: '20px'
         }}>
           <h3 style={{ color: '#155724', marginTop: 0 }}>✅ Dosya Başarıyla Queue'ya Eklendi!</h3>
-          
           <div style={{ marginBottom: '15px' }}>
             <strong>📁 Dosya:</strong> {result.results.fileName}
             <br />
@@ -298,7 +227,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
               {result.results.batchId}
             </code>
           </div>
-          
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
@@ -309,19 +237,16 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
               <div style={{ fontWeight: 'bold', color: '#2e7d32' }}>📊 Toplam Kelime</div>
               <div style={{ fontSize: '24px' }}>{result.results.totalWords.toLocaleString()}</div>
             </div>
-            
             <div style={{ backgroundColor: '#e8f5e8', padding: '10px', borderRadius: '3px' }}>
               <div style={{ fontWeight: 'bold', color: '#2e7d32' }}>✅ Queue'ya Eklendi</div>
               <div style={{ fontSize: '24px' }}>{result.results.queued.toLocaleString()}</div>
             </div>
-            
             {result.results.duplicates > 0 && (
               <div style={{ backgroundColor: '#fff3e0', padding: '10px', borderRadius: '3px' }}>
                 <div style={{ fontWeight: 'bold', color: '#f57c00' }}>⚠️ Zaten Queue'da</div>
                 <div style={{ fontSize: '24px' }}>{result.results.duplicates.toLocaleString()}</div>
               </div>
             )}
-            
             {result.results.failed > 0 && (
               <div style={{ backgroundColor: '#ffebee', padding: '10px', borderRadius: '3px' }}>
                 <div style={{ fontWeight: 'bold', color: '#d32f2f' }}>❌ Başarısız</div>
@@ -329,7 +254,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
               </div>
             )}
           </div>
-
           <div style={{ 
             backgroundColor: '#cce5ff', 
             padding: '15px', 
@@ -351,13 +275,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         </div>
       )}
 
-      {/* Info Box */}
       <div style={{
         backgroundColor: '#e9ecef',
         padding: '15px',
         borderRadius: '5px',
         fontSize: '14px',
-        color: '#495057'
+        color: '#495057',
+        marginTop: '20px'
       }}>
         <h4 style={{ margin: '0 0 10px 0' }}>ℹ️ 6 Aşamalı Analiz Sistemi</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
@@ -378,7 +302,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
             </ol>
           </div>
         </div>
-        
         <div style={{ 
           marginTop: '10px',
           padding: '8px',
