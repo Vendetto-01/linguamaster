@@ -10,13 +10,14 @@ if (!GEMINI_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }); // Consider gemini-1.5-pro for complex JSON generation if flash struggles
+// Updated to use the specified preview model
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" }); 
 
 const generationConfig = {
-  temperature: 0.7, // May need adjustment for complex structured JSON
+  temperature: 0.7, 
   topK: 1,
   topP: 1,
-  maxOutputTokens: 3072, // Increased further due to more complex per-definition data
+  maxOutputTokens: 3072, 
   responseMimeType: "application/json",
 };
 
@@ -27,27 +28,25 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-// Details for each definition, now including its own quiz options
 interface GeminiDefinitionDetail {
   definition_text: string;
   part_of_speech: string;
   difficulty_level: string; 
   example_sentence: string;
-  option_a: string; // Correct answer for this specific definition
-  option_b: string; // Distractor
-  option_c: string; // Distractor
-  option_d: string; // Distractor
+  option_a: string; 
+  option_b: string; 
+  option_c: string; 
+  option_d: string; 
 }
 
-// Updated main response structure from Gemini
 interface GeminiWordResponse {
-  definitions: GeminiDefinitionDetail[]; // Array of detailed definition objects, each with its own quiz options
+  definitions: GeminiDefinitionDetail[]; 
 }
 
 export const addWordService = async (wordSubmission: { word: string }): Promise<WordEntry[]> => {
   const { word } = wordSubmission;
 
-  console.log(`Calling Gemini API for: ${word}`);
+  console.log(`Calling Gemini API for: ${word} using model gemini-2.5-flash-preview-05-20`);
 
   const prompt = `
     For the English vocabulary word "${word}", provide a JSON object with a single top-level key: "definitions".
@@ -98,7 +97,7 @@ export const addWordService = async (wordSubmission: { word: string }): Promise<
       if (!isValidDetail) continue;
 
       wordEntriesToInsert.push({
-        word: word, // The original submitted word
+        word: word, 
         part_of_speech: detail.part_of_speech.trim(),
         definition: detail.definition_text.trim(),
         difficulty_level: detail.difficulty_level.trim(),
