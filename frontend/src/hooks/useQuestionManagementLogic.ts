@@ -26,19 +26,20 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     hasNext: false,
     hasPrev: false
   });
-  const [currentPage, setCurrentPage] = useState(1);
+
   const [filters, setFilters] = useState<QuestionFilterParams>({});
   const [sort, setSort] = useState<QuestionSortParams>({
     sortBy: 'created_at',
     sortOrder: 'desc'
   });
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectAllOnPage, setSelectAllOnPage] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(10);
   const [progress, setProgress] = useState<QuestionGenerationProgress | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -49,7 +50,7 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     try {
       const response = await questionsApi.getQuestions({
         ...filters,
-        page: currentPage,
+        page: pagination.currentPage,
         limit: pageSize,
         ...sort
       });
@@ -60,15 +61,12 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     } finally {
       setIsLoading(false);
     }
-  }, [filters, currentPage, pageSize, sort]);
+  }, [filters, pagination.currentPage, pageSize, sort]);
 
   // Filtreleme işlemi
   const handleFilterChange = (newFilters: QuestionFilterParams) => {
-    setFilters(prevFilters => ({
-      ...prevFilters,
-      ...newFilters
-    }));
-    setCurrentPage(1);
+    setFilters(prev => ({ ...prev, ...newFilters }));
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
   };
 
   // Sıralama işlemi
@@ -78,11 +76,11 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
 
   // Sayfa değiştirme
   const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
+    setPagination(prev => ({ ...prev, currentPage: newPage }));
   };
 
   // Soru seçme işlemleri
-  const toggleSelectQuestion = (questionId: string) => {
+  const toggleSelectQuestion = useCallback((questionId: string) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(questionId)) {
@@ -92,18 +90,20 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
       }
       return newSet;
     });
-  };
+  }, []);
 
   // Toplu seçim işlemleri
-  const toggleSelectAllOnPage = () => {
-    if (selectAllOnPage) {
-      setSelectedIds(new Set());
-    } else {
-      const pageIds = questions.map(q => q.id);
-      setSelectedIds(new Set(pageIds));
-    }
-    setSelectAllOnPage(!selectAllOnPage);
-  };
+  const toggleSelectAllOnPage = useCallback(() => {
+    setSelectAllOnPage(prev => {
+      if (prev) {
+        setSelectedIds(new Set());
+        return false;
+      } else {
+        setSelectedIds(new Set(questions.map(q => q.id)));
+        return true;
+      }
+    });
+  }, [questions]);
 
   // Soru güncelleme işlemi
   const handleUpdateQuestion = async (questionId: string, updates: Partial<Question>) => {
@@ -119,12 +119,12 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
   const handleDeleteQuestion = async (questionId: string) => {
     try {
       await questionsApi.deleteQuestion(questionId);
-      await fetchQuestions();
       setSelectedIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(questionId);
         return newSet;
       });
+      await fetchQuestions();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Soru silinirken bir hata oluştu');
     }
@@ -157,7 +157,7 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
 
     try {
       const generationResult = await questionsApi.generateQuestions({
-        wordIds: wordIds,
+        wordIds,
         maxConcurrent: 5,
         validateQuality: true
       });
@@ -196,11 +196,11 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
   }, []);
 
   return {
+    // State exports
     questions,
     isLoading,
     error,
     pagination,
-    currentPage,
     filters,
     sort,
     selectedIds,
@@ -209,10 +209,10 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     showEditModal,
     questionToDelete,
     showDeleteModal,
-    pageSize,
     progress,
     isGenerating,
 
+    // Method exports
     fetchQuestions,
     handleFilterChange,
     handleSortChange,
@@ -224,10 +224,10 @@ export const useQuestionManagementLogic = ({ refreshKey }: UseQuestionManagement
     handleBulkDelete,
     generateQuestions,
     
+    // Modal control exports
     setEditingQuestion,
     setShowEditModal,
     setQuestionToDelete,
     setShowDeleteModal,
-    setPageSize
   };
 };
