@@ -1,10 +1,9 @@
-// frontend/src/components/questions/QuestionManagement.tsx
 import React, { useState } from 'react';
 import { useQuestionManagementLogic } from '../../hooks/useQuestionManagementLogic';
 import QuestionCard from './QuestionCard';
 import QuestionFilters from './QuestionFilters';
 import Pagination from '../shared/Pagination';
-import DeleteConfirmationModal from '../shared/DeleteConfirmationModal';
+import DeleteConfirmationModal from '../shared/DeleteConfirmationModal'; // Fixed import path
 import EditQuestionModal from './EditQuestionModal';
 import LoadingSpinner from '../shared/LoadingSpinner';
 import { Question, QuestionFilterParams, QuestionSortParams } from '../../types/questions';
@@ -45,7 +44,29 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
     setShowDeleteModal,
   } = useQuestionManagementLogic({ refreshKey });
 
-  // ... rest of the handlers ...
+  const handleDelete = async (question: Question) => {
+    setQuestionToDelete(question);
+    setShowDeleteModal(true);
+  };
+
+  const handleEdit = (question: Question) => {
+    setEditingQuestion(question);
+    setShowEditModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (questionToDelete) {
+      await handleDeleteQuestion(questionToDelete.id);
+      setShowDeleteModal(false);
+      setQuestionToDelete(null);
+    }
+  };
+
+  const handleBulkDeleteClick = async () => {
+    if (selectedIds.size > 0) {
+      await handleBulkDelete();
+    }
+  };
 
   if (isLoading && questions.length === 0) {
     return <LoadingSpinner />;
@@ -53,7 +74,6 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
 
   return (
     <div className="question-management">
-      {/* Header Section */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -67,12 +87,57 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
           </p>
         </div>
 
-        {/* ... rest of the header ... */}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="btn btn-outline-secondary"
+          >
+            {showFilters ? 'Filtreleri Gizle' : 'Filtrele'}
+          </button>
+          
+          {selectedIds.size > 0 && (
+            <button
+              onClick={handleBulkDeleteClick}
+              className="btn btn-danger"
+            >
+              Seçilenleri Sil ({selectedIds.size})
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Question list or empty state ... */}
+      {showFilters && (
+        <QuestionFilters
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onSortChange={handleSortChange}
+        />
+      )}
 
-      {/* Pagination */}
+      {questions.map(question => (
+        <QuestionCard
+          key={question.id}
+          question={question}
+          selected={selectedIds.has(question.id)}
+          onSelect={() => toggleSelectQuestion(question.id)}
+          onEdit={() => handleEdit(question)}
+          onDelete={() => handleDelete(question)}
+        />
+      ))}
+
+      {questions.length === 0 && !isLoading && (
+        <div style={{
+          textAlign: 'center',
+          padding: '40px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '8px',
+          marginTop: '20px'
+        }}>
+          <h4>Soru Bulunamadı</h4>
+          <p>Seçili filtrelerle eşleşen soru bulunmamaktadır.</p>
+        </div>
+      )}
+
       {questions.length > 0 && (
         <Pagination
           currentPage={pagination.currentPage}
@@ -81,7 +146,6 @@ const QuestionManagement: React.FC<QuestionManagementProps> = ({ refreshKey }) =
         />
       )}
 
-      {/* Modals */}
       <DeleteConfirmationModal
         show={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
