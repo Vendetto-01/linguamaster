@@ -31,8 +31,8 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-// Interface for the expected Gemini response for a single definition update
-interface GeminiReportUpdateDetail {
+// Interfaces for Gemini response (similar to word.service.ts)
+interface GeminiDefinitionDetail {
   definition_text: string;
   part_of_speech: string;
   difficulty_level: string;
@@ -41,10 +41,12 @@ interface GeminiReportUpdateDetail {
   option_b: string;
   option_c: string;
   option_d: string;
-  update_applied?: boolean; // Optional: Gemini can indicate if it applied a change
-  error?: string; // Optional: Gemini can return an error message
 }
 
+interface GeminiWordResponse {
+  definitions: GeminiDefinitionDetail[];
+  error?: string; // Added error field for direct error reporting from Gemini
+}
 
 const BATCH_SIZE = 5; // Reduced batch size for potentially longer AI processing per report
 const DELAY_BETWEEN_REPORTS_MS = 1000; // Delay between processing individual reports (if needed)
@@ -111,84 +113,91 @@ export const processPendingReports = async (): Promise<void> => {
       }
       const currentWordEntry = wordData as WordEntry;
 
-      // 2. Construct Gemini Prompt
+      // 2. Construct Gemini Prompt (to regenerate the word entry from scratch)
+      // We use currentWordEntry.word to get the base word for regeneration.
       const prompt = `
-        A user has reported an issue with the following English vocabulary word entry:
-        Word: "${currentWordEntry.word}"
-        Part of Speech: ${currentWordEntry.part_of_speech}
-        Current Definition: "${currentWordEntry.definition}"
-        Current Difficulty: ${currentWordEntry.difficulty_level}
-        Current Example Sentence: "${currentWordEntry.example_sentence}"
-        Current Quiz Options:
-          A: "${currentWordEntry.option_a}"
-          B: "${currentWordEntry.option_b}"
-          C: "${currentWordEntry.option_c}"
-          D: "${currentWordEntry.option_d}"
+        For the English vocabulary word "${currentWordEntry.word}", provide a JSON object with a single top-level key: "definitions".
+        The value of "definitions" must be an array of objects. Each object in this array represents a distinct meaning of the word and must contain the following fields:
+        1.  "definition_text": A distinct dictionary-style definition for this specific meaning of the word.
+        2.  "part_of_speech": The specific part of speech for this definition (e.g., noun, verb, adjective).
+        3.  "difficulty_level": The CEFR difficulty level for this definition (e.g., A1, A2, B1, B2, C1, C2).
+        4.  "example_sentence": A unique example sentence using the word that specifically matches this "definition_text", "part_of_speech", and "difficulty_level".
+        5.  "option_a": This exact "definition_text" (or a very close, accurate paraphrase of it), serving as the correct multiple-choice answer.
+        6.  "option_b": An incorrect but plausible multiple-choice option (a distractor) relevant to this specific "definition_text".
+        7.  "option_c": Another distinct incorrect but plausible multiple-choice option for this "definition_text".
+        8.  "option_d": A third distinct incorrect but plausible multiple-choice option for this "definition_text".
 
-        User's Report Reason: "${report.report_reason}"
-        User's Report Details (if any): "${report.report_details || 'N/A'}"
-
-        Task:
-        1. Review the word entry based on the user's report.
-        2. If the report is valid and a correction is needed, provide an updated JSON object for this single word definition.
-           The JSON object MUST contain ALL of the following fields, even if some are unchanged:
-           'definition_text', 'part_of_speech', 'difficulty_level', 'example_sentence', 'option_a', 'option_b', 'option_c', 'option_d'.
-           The 'option_a' MUST be the correct definition or a very close paraphrase.
-        3. If the report is invalid, or no changes are necessary, return the ORIGINAL word data in the exact same JSON format described above.
-        4. If you cannot process this request, or the report seems malicious/spam, return a JSON object with a single key "error" and a brief explanation string as its value.
-
-        Output ONLY the JSON object. Do not include any other text, explanations, or markdown formatting.
+        The question for these options will be: "What is the meaning of the word '${currentWordEntry.word}' used in the following sentence?"
+        (The frontend will dynamically generate the sentence part of the question using the "example_sentence" from this object).
+        
+        If you cannot process this request or the word is problematic, return a JSON object with a single key "error" and a brief explanation string as its value.
+        Output ONLY the JSON object. Ensure each "example_sentence" is unique and relevant to its corresponding "definition_text", and that all quiz options are tailored to that specific definition.
       `;
 
       // 3. Call Gemini API
-      console.log(`ReportWorker: Calling Gemini for report ID ${report.id}, word ID ${report.word_id}`);
+      console.log(`ReportWorker: Calling Gemini to regenerate word ID ${report.word_id} ("${currentWordEntry.word}") for report ID ${report.id}`);
       const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig,
         safetySettings,
       });
       const responseText = result.response.text();
-      const geminiResponse = JSON.parse(responseText) as GeminiReportUpdateDetail;
+      // Use the correct GeminiWordResponse interface
+      const geminiResponse = JSON.parse(responseText) as GeminiWordResponse;
 
       if (geminiResponse.error) {
-        throw new Error(`Gemini reported an error: ${geminiResponse.error}`);
+        throw new Error(`Gemini reported an error for word "${currentWordEntry.word}": ${geminiResponse.error}`);
       }
 
-      // Validate Gemini response structure (basic check)
-      const requiredKeys: Array<keyof Omit<GeminiReportUpdateDetail, 'update_applied' | 'error'>> = [
-        'definition_text', 'part_of_speech', 'difficulty_level', 'example_sentence',
-        'option_a', 'option_b', 'option_c', 'option_d'
-      ];
-      for (const key of requiredKeys) {
-        if (!(key in geminiResponse) || typeof geminiResponse[key] !== 'string' || geminiResponse[key].trim() === '') {
-          throw new Error(`Gemini response for report ${report.id} is missing or has an empty required field: ${key}`);
-        }
+      if (!geminiResponse.definitions || !Array.isArray(geminiResponse.definitions) || geminiResponse.definitions.length === 0) {
+        throw new Error(`Gemini response for word "${currentWordEntry.word}" must be an object with a non-empty "definitions" array.`);
       }
       
-      // 4. Update 'words' Table
+      // We are updating a specific word_id, so we'll use the first valid definition from Gemini's response.
+      const firstValidDefinition = geminiResponse.definitions.find(def => {
+        const requiredKeys: Array<keyof GeminiDefinitionDetail> = [ // Use GeminiDefinitionDetail here
+          'definition_text', 'part_of_speech', 'difficulty_level', 'example_sentence',
+          'option_a', 'option_b', 'option_c', 'option_d'
+        ];
+        for (const key of requiredKeys) {
+          if (!(key in def) || typeof def[key] !== 'string' || def[key].trim() === '') {
+            console.warn(`ReportWorker: Skipping a definition for word "${currentWordEntry.word}" (report ID ${report.id}) due to missing/empty field: ${String(key)}`); // Use String(key) for logging
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (!firstValidDefinition) {
+        throw new Error(`No valid definitions with complete quiz options found for word "${currentWordEntry.word}" (report ID ${report.id}) after processing Gemini response.`);
+      }
+      
+      // 4. Update 'words' Table with the first valid definition
       const { error: updateWordError } = await supabase
         .from('words')
         .update({
-          definition: geminiResponse.definition_text.trim(),
-          part_of_speech: geminiResponse.part_of_speech.trim(),
-          difficulty_level: geminiResponse.difficulty_level.trim(),
-          example_sentence: geminiResponse.example_sentence.trim(),
-          option_a: geminiResponse.option_a.trim(),
-          option_b: geminiResponse.option_b.trim(),
-          option_c: geminiResponse.option_c.trim(),
-          option_d: geminiResponse.option_d.trim(),
-          updated_at: new Date().toISOString(), // Update timestamp
-          update_note: `AI corrected based on report ID ${report.id}. Reason: ${report.report_reason.substring(0,100)}`
+          // word: currentWordEntry.word, // Word text itself should not change based on this process
+          part_of_speech: firstValidDefinition.part_of_speech.trim(),
+          definition: firstValidDefinition.definition_text.trim(),
+          difficulty_level: firstValidDefinition.difficulty_level.trim(),
+          example_sentence: firstValidDefinition.example_sentence.trim(),
+          option_a: firstValidDefinition.option_a.trim(),
+          option_b: firstValidDefinition.option_b.trim(),
+          option_c: firstValidDefinition.option_c.trim(),
+          option_d: firstValidDefinition.option_d.trim(),
+          updated_at: new Date().toISOString(),
+          // Update note reflects regeneration due to report, not the original report reason directly in Gemini's context
+          update_note: `AI regenerated based on report ID ${report.id}. Original report reason: ${report.report_reason ? report.report_reason.substring(0,100) : 'N/A'}`
         })
-        .eq('id', report.word_id);
+        .eq('id', report.word_id); // Ensure we update the correct existing entry
 
       if (updateWordError) {
-        throw new Error(`Failed to update word ID ${report.word_id} in words table: ${updateWordError.message}`);
+        throw new Error(`Failed to update word ID ${report.word_id} ("${currentWordEntry.word}") in words table: ${updateWordError.message}`);
       }
       
-      console.log(`ReportWorker: Successfully updated word ID ${report.word_id} based on Gemini response for report ID ${report.id}.`);
+      console.log(`ReportWorker: Successfully regenerated and updated word ID ${report.word_id} ("${currentWordEntry.word}") based on report ID ${report.id}.`);
       reportStatus = 'resolved';
-      adminNoteMessage = `AI processed and resolved report ${report.id}. Word ID ${report.word_id} updated.`;
+      adminNoteMessage = `AI regenerated and resolved report ${report.id}. Word ID ${report.word_id} ("${currentWordEntry.word}") updated.`;
       aiChecked = true;
 
     } catch (processingError: any) {
