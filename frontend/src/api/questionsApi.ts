@@ -3,48 +3,54 @@ import {
   Question, 
   QuestionGenerationConfig,
   QuestionGenerationResponse,
-  PaginatedQuestionsResponse,
+  PaginationInfo,
   QuestionFilterParams,
   QuestionSortParams,
   BulkActionResponse 
 } from '../types/questions';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-
-interface GetQuestionsParams extends QuestionFilterParams, QuestionSortParams {
-  page?: number;
-  limit?: number;
+interface GetQuestionsResponse {
+  data: Question[];
+  pagination: PaginationInfo;
 }
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 class QuestionsApi {
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        // Eğer authentication varsa buraya eklenebilir
-      },
-      ...options,
-    });
+  private async request<T>(
+    endpoint: string, 
+    options: RequestInit = {}
+  ): Promise<T> {
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        ...options,
+      });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'API request failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'API request failed');
     }
-
-    return response.json();
   }
 
-  async getQuestions(params: GetQuestionsParams): Promise<PaginatedQuestionsResponse> {
+  async getQuestions(params: QuestionFilterParams & QuestionSortParams): Promise<GetQuestionsResponse> {
     const queryParams = new URLSearchParams();
     
-    if (params.page) queryParams.append('page', params.page.toString());
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.searchTerm) queryParams.append('search', params.searchTerm);
-    if (params.difficulty) queryParams.append('difficulty', params.difficulty);
-    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, value.toString());
+      }
+    });
 
-    return this.request<PaginatedQuestionsResponse>(`/api/questions?${queryParams}`);
+    return this.request<GetQuestionsResponse>(`/api/questions?${queryParams}`);
   }
 
   async generateQuestions(config: QuestionGenerationConfig): Promise<QuestionGenerationResponse> {
